@@ -482,10 +482,14 @@ thunar_transfer_job_copy_node (ThunarTransferJob  *job,
                                GError            **error)
 {
   ThunarJobResponse response;
+  const gchar      *source_display_name;
+  const gchar      *target_display_name;
   GFileInfo        *info;
+  GFileInfo        *target_info;
   GError           *err = NULL;
   GFile            *real_target_file = NULL;
   gchar            *base_name;
+  gchar            *message = NULL;
 
   _thunar_return_if_fail (THUNAR_IS_TRANSFER_JOB (job));
   _thunar_return_if_fail (node != NULL && G_IS_FILE (node->source_file));
@@ -524,8 +528,81 @@ thunar_transfer_job_copy_node (ThunarTransferJob  *job,
           break;
         }
 
+      /* determine the source file display name */
+      source_display_name = g_file_info_get_display_name (info);
+
+      /* query file info for the target parent */
+      if (target_parent_file != NULL)
+        {
+          target_info = g_file_query_info (target_parent_file,
+                                           G_FILE_ATTRIBUTE_STANDARD_DISPLAY_NAME,
+                                           G_FILE_QUERY_INFO_NOFOLLOW_SYMLINKS,
+                                           exo_job_get_cancellable (EXO_JOB (job)),
+                                           &err);
+        }
+      else
+        {
+          target_parent_file = g_file_get_parent (target_file);
+
+          if (target_parent_file != NULL)
+            {
+              target_info = g_file_query_info (target_parent_file,
+                                               G_FILE_ATTRIBUTE_STANDARD_DISPLAY_NAME,
+                                               G_FILE_QUERY_INFO_NOFOLLOW_SYMLINKS,
+                                               exo_job_get_cancellable (EXO_JOB (job)),
+                                               &err);
+              g_object_unref (target_parent_file);
+            }
+          else
+            {
+              target_info = g_file_query_info (target_file,
+                                               G_FILE_ATTRIBUTE_STANDARD_DISPLAY_NAME,
+                                               G_FILE_QUERY_INFO_NOFOLLOW_SYMLINKS,
+                                               exo_job_get_cancellable (EXO_JOB (job)),
+                                               &err);
+            }
+        }
+
+      /* abort on error or cancellation */
+      if (info == NULL)
+        {
+          g_object_unref (target_file);
+          break;
+        }
+
+      /* determine the target display name */
+      target_display_name = g_file_info_get_display_name (target_info);
+
+      /* generate info message */
+      if (job->type == THUNAR_TRANSFER_JOB_COPY)
+        {
+          message = g_strdup_printf (_("Copying \"%s\" to \"%s\""),
+                                     source_display_name, target_display_name);
+        }
+      else if (job->type == THUNAR_TRANSFER_JOB_TRASH 
+               && thunar_g_file_is_trashed (target_file))
+        {
+          message = g_strdup_printf (_("Trashing \"%s\""), source_display_name);
+        }
+      else if (job->type == THUNAR_TRANSFER_JOB_MOVE)
+        {
+          message = g_strdup_printf (_("Moving \"%s\" to \"%s\""),
+                                     source_display_name, target_display_name);
+        }
+      else
+        {
+          message = g_strdup_printf (_("Creating link to \"%s\" in \"%s\""),
+                                     source_display_name, target_display_name);
+        }
+
       /* update progress information */
-      exo_job_info_message (EXO_JOB (job), g_file_info_get_display_name (info));
+      exo_job_info_message (EXO_JOB (job), message);
+
+      /* free the message string */
+      g_free (message);
+
+      /* release the target info */
+      g_object_unref (target_info);
 
 retry_copy:
       /* copy the item specified by this node (not recursively) */
