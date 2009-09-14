@@ -108,7 +108,7 @@ thunar_progress_dialog_init (ThunarProgressDialog *dialog)
   gtk_container_add (GTK_CONTAINER (dialog), dialog->vbox);
   gtk_widget_show (dialog->vbox);
 
-  dialog->content_box = gtk_vbox_new (FALSE, 12);
+  dialog->content_box = gtk_vbox_new (FALSE, 18);
   gtk_container_set_border_width (GTK_CONTAINER (dialog->content_box), 8);
   gtk_container_add (GTK_CONTAINER (dialog->vbox), dialog->content_box);
   gtk_widget_show (dialog->content_box);
