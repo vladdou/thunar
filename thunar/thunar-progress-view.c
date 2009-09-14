@@ -180,11 +180,12 @@ thunar_progress_view_init (ThunarProgressView *view)
   gtk_container_add (GTK_CONTAINER (view), vbox);
   gtk_widget_show (vbox);
 
-  hbox = gtk_hbox_new (FALSE, 12);
+  hbox = gtk_hbox_new (FALSE, 0);
   gtk_box_pack_start (GTK_BOX (vbox), hbox, TRUE, TRUE, 0);
   gtk_widget_show (hbox);
 
   image = g_object_new (GTK_TYPE_IMAGE, "icon-size", GTK_ICON_SIZE_BUTTON, NULL);
+  gtk_misc_set_padding (GTK_MISC (image), 6, 0);
   gtk_box_pack_start (GTK_BOX (hbox), image, FALSE, TRUE, 0);
   gtk_widget_show (image);
 
@@ -192,18 +193,12 @@ thunar_progress_view_init (ThunarProgressView *view)
   gtk_box_pack_start (GTK_BOX (hbox), vbox2, TRUE, TRUE, 0);
   gtk_widget_show (vbox2);
 
-  label = g_object_new (GTK_TYPE_LABEL, "xalign", 0.0f, NULL);
-  gtk_label_set_attributes (GTK_LABEL (label), thunar_pango_attr_list_big_bold ());
-  gtk_label_set_ellipsize (GTK_LABEL (label), PANGO_ELLIPSIZE_MIDDLE);
-  gtk_box_pack_start (GTK_BOX (vbox2), label, TRUE, TRUE, 0);
-  gtk_widget_show (label);
-
   view->progress_label = g_object_new (GTK_TYPE_LABEL, "xalign", 0.0f, NULL);
   gtk_label_set_ellipsize (GTK_LABEL (view->progress_label), PANGO_ELLIPSIZE_MIDDLE);
   gtk_box_pack_start (GTK_BOX (vbox2), view->progress_label, TRUE, TRUE, 0);
   gtk_widget_show (view->progress_label);
 
-  hbox = gtk_hbox_new (FALSE, 12);
+  hbox = gtk_hbox_new (FALSE, 6);
   gtk_box_pack_start (GTK_BOX (vbox), hbox, FALSE, TRUE, 0);
   gtk_widget_show (hbox);
 
@@ -220,7 +215,7 @@ thunar_progress_view_init (ThunarProgressView *view)
   exo_binding_new (G_OBJECT (view), "icon-name", G_OBJECT (image), "icon-name");
 
   /* connect the view title to the action label */
-  exo_binding_new (G_OBJECT (view), "title", G_OBJECT (label), "label");
+  exo_binding_new (G_OBJECT (view), "title", G_OBJECT (view->progress_label), "label");
 }
 
 
