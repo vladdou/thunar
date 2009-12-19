@@ -118,16 +118,17 @@ dnl **********************************
 dnl *** Check for standard headers ***
 dnl **********************************
 AC_CHECK_HEADERS([ctype.h errno.h fcntl.h grp.h limits.h locale.h memory.h \
-                  paths.h pwd.h sched.h signal.h stdarg.h stdlib.h string.h \
-                  sys/mman.h sys/stat.h sys/time.h sys/types.h sys/uio.h \
-                  sys/wait.h time.h])
+                  paths.h pwd.h sched.h signal.h stdarg.h stdio.h stdlib.h \
+                  string.h sys/mman.h sys/stat.h sys/time.h sys/types.h \
+                  sys/uio.h sys/wait.h time.h])
 
 dnl ************************************
 dnl *** Check for standard functions ***
 dnl ************************************
 AC_FUNC_MMAP()
-AC_CHECK_FUNCS([localeconv mkdtemp pread pwrite sched_yield setgroupent \
-                setpassent strcoll strlcpy strptime symlink])
+AC_CHECK_FUNCS([localeconv mkdtemp posix_madvise pread pwrite sched_yield \
+                setgroupent setpassent setpriority strcoll strlcpy strptime \
+                symlink])
 
 dnl ******************************
 dnl *** Check for i18n support ***
@@ -157,8 +158,13 @@ dnl **********************************
 XDT_CHECK_OPTIONAL_PACKAGE([GIO_UNIX], [gio-unix-2.0],
                            [2.18.0], [gio-unix], [GIO UNIX features])
 
-dnl *******************************************************
-dnl *** Optional support for gconf (GNOME thumbnailers) ***
+dnl **********************************************************
+dnl *** Optional tumbler plugin for ThunarVFS thumbnailers ***
+dnl **********************************************************
+XDT_CHECK_OPTIONAL_PACKAGE([TUMBLER], [tumbler-1], 
+                           [0.1.0], [tumbler], 
+                           [Tumbler plugin for ThunarVFS thumbnailers])
+
 dnl **********************************
 dnl *** Optional support for D-BUS ***
 dnl **********************************
@@ -281,6 +287,8 @@ thunar/Makefile
 thunarx/Makefile
 thunarx/thunarx-2.pc
 thunarx/thunarx-config.h
+tumbler-plugins/Makefile
+tumbler-plugins/thunar-vfs-thumbnailer/Makefile
 ])
 
 dnl ***************************
@@ -290,28 +298,33 @@ echo
 echo "Build Configuration:"
 echo
 if test x"$DBUS_FOUND" = x"yes"; then
-echo "* D-BUS support:             yes"
+echo "* D-BUS support:                             yes"
 else
-echo "* D-BUS support:             no"
+echo "* D-BUS support:                             no"
+fi
+if test x"$TUMBLER_FOUND" = x"yes"; then
+echo "* Tumbler plugin for ThunarVFS thumbnailers: yes"
+else
+echo "* Tumbler plugin for ThunarVFS thumbnailers: no"
 fi
 if test x"$GIO_UNIX_FOUND" = x"yes"; then
-echo "* GIO UNIX features:         yes"
+echo "* GIO UNIX features:                         yes"
 else
-echo "* GIO UNIX features:         no"
+echo "* GIO UNIX features:                         no"
 fi
 if test x"$LIBSTARTUP_NOTIFICATION_FOUND" = x"yes"; then
-echo "* Startup Notification:      yes"
+echo "* Startup Notification:                      yes"
 else
-echo "* Startup Notification:      no"
+echo "* Startup Notification:                      no"
 fi
-echo "* Debug Support:             $enable_debug"
-echo "* Generate Documentation:    $enable_gen_doc"
+echo "* Debug Support:                             $enable_debug"
+echo "* Generate Documentation:                    $enable_gen_doc"
 echo
 echo "Additional Plugins:"
 echo
-echo "* Advanced Properties:       $ac_bm_thunar_plugin_apr"
-echo "* Simple Builting Renamers:  $ac_bm_thunar_plugin_sbr"
-echo "* Trash Panel Applet:        $ac_bm_thunar_plugin_tpa"
-echo "* User Customizable Actions: $ac_bm_thunar_plugin_uca"
-echo "* Wallpaper support:         $ac_bm_thunar_plugin_wallpaper"
+echo "* Advanced Properties:                       $ac_bm_thunar_plugin_apr"
+echo "* Simple Builting Renamers:                  $ac_bm_thunar_plugin_sbr"
+echo "* Trash Panel Applet:                        $ac_bm_thunar_plugin_tpa"
+echo "* User Customizable Actions:                 $ac_bm_thunar_plugin_uca"
+echo "* Wallpaper support:                         $ac_bm_thunar_plugin_wallpaper"
 echo
