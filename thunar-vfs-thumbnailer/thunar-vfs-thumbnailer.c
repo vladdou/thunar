@@ -1,5 +1,6 @@
 /* vi:set et ai sw=2 sts=2 ts=2: */
 /*-
+ * Copyright (c) 2004-2007 Benedikt Meurer <benny@xfce.org>
  * Copyright (c) 2009 Jannis Pohlmann <jannis@xfce.org>
  *
  * This library is free software; you can redistribute it and/or
@@ -24,6 +25,9 @@
 
 #ifdef HAVE_SYS_MMAN_H
 #include <sys/mman.h>
+#endif
+#ifdef HAVE_SYS_RESOURCE_H
+#include <sys/resource.h>
 #endif
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
@@ -111,6 +115,7 @@ static void     thunar_vfs_thumbnailer_cache_watch_destroy (gpointer            
 static void     thunar_vfs_thumbnailer_create              (TumblerAbstractThumbnailer *thumbnailer,
                                                             GCancellable               *cancellable,
                                                             TumblerFileInfo            *info);
+static void     thunar_vfs_thumbnailer_update_supported    (ThunarVfsThumbnailer       *thumbnailer);
 
 
 
@@ -325,6 +330,9 @@ thunar_vfs_thumbnailer_cache_load (ThunarVfsThumbnailer *thumbnailer)
     }
 
   g_free (cache_path);
+
+  /* compute new hash keys and notify supported-changed listeners */
+  thunar_vfs_thumbnailer_update_supported (thumbnailer);
 }
 
 
@@ -597,4 +605,28 @@ thunar_vfs_thumbnailer_create (TumblerAbstractThumbnailer *thumbnailer,
   g_object_unref (thumbnail);
   g_object_unref (pixbuf);
   g_object_unref (source_pixbuf);
+}
+
+
+
+static void
+thunar_vfs_thumbnailer_update_supported (ThunarVfsThumbnailer *thumbnailer)
+{
+  const gchar **mime_types;
+  gint          num_mime_types;
+  gint          n;
+
+  g_return_if_fail (IS_THUNAR_VFS_THUMBNAILER (thumbnailer));
+
+  num_mime_types = CACHE_READ32 (thumbnailer->cache, 8);
+
+  mime_types = g_slice_alloc0 (sizeof (const gchar *) * num_mime_types + 1);
+  mime_types[num_mime_types] = NULL;
+
+  for (n = 0; n < num_mime_types; ++n)
+    mime_types[n] = thumbnailer->cache + CACHE_READ32 (cache, 16 + 8 * n + 4);
+
+  tumbler_thumbnailer_set_mime_types (thumbnailer, mime_types);
+
+  g_strfreev (mime_types);
 }

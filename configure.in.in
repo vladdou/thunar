@@ -119,8 +119,8 @@ dnl *** Check for standard headers ***
 dnl **********************************
 AC_CHECK_HEADERS([ctype.h errno.h fcntl.h grp.h limits.h locale.h memory.h \
                   paths.h pwd.h sched.h signal.h stdarg.h stdio.h stdlib.h \
-                  string.h sys/mman.h sys/stat.h sys/time.h sys/types.h \
-                  sys/uio.h sys/wait.h time.h])
+                  string.h sys/mman.h sys/resource.h sys/stat.h sys/time.h \
+                  sys/types.h sys/uio.h sys/wait.h time.h])
 
 dnl ************************************
 dnl *** Check for standard functions ***
@@ -287,8 +287,7 @@ thunar/Makefile
 thunarx/Makefile
 thunarx/thunarx-2.pc
 thunarx/thunarx-config.h
-tumbler-plugins/Makefile
-tumbler-plugins/thunar-vfs-thumbnailer/Makefile
+thunar-vfs-thumbnailer/Makefile
 ])
 
 dnl ***************************

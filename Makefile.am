@@ -8,6 +8,7 @@ SUBDIRS =								\
 	tdb								\
 	thunarx								\
 	thunar								\
+	thunar-vfs-thumbnailer						\
 	docs								\
 	examples							\
 	plugins

@@ -105,12 +105,14 @@ thunar_vfs_thumbnailer_provider_get_thumbnailers (TumblerThumbnailerProvider *pr
 {
   ThunarVfsThumbnailer *thumbnailer;
   GList                *thumbnailers = NULL;
-  const gchar          *uri_schemes[] = { NULL, };
+  const gchar          *uri_schemes[] = { "file", NULL };
   const gchar          *mime_types[] = { NULL, };
 
   /* create the pixbuf thumbnailer */
-  thumbnailer = g_object_new (TYPE_THUNAR_VFS_THUMBNAILER, "mime-types", mime_types,
-                              "uri-schemes", uri_schemes, NULL);
+  thumbnailer = g_object_new (TYPE_THUNAR_VFS_THUMBNAILER, 
+                              "mime-types", mime_types,
+                              "uri-schemes", uri_schemes, 
+                              NULL);
 
   /* add the thumbnailer to the list */
   thumbnailers = g_list_append (thumbnailers, thumbnailer);
