@@ -237,6 +237,7 @@ Thunar_CFLAGS =								\
 
 Thunar_LDFLAGS =							\
 	-no-undefined							\
+	-lm								\
 	$(LIBSM_LDFLAGS)						\
 	$(PLATFORM_LDFLAGS)
 

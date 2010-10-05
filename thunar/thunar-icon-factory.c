@@ -26,6 +26,9 @@
 #include <config.h>
 #endif
 
+#ifdef HAVE_MATH_H
+#include <math.h>
+#endif
 #ifdef HAVE_MEMORY_H
 #include <memory.h>
 #endif
@@ -454,11 +457,10 @@ thunar_icon_factory_load_from_file (ThunarIconFactory *factory,
       needs_frame = (strstr (path, G_DIR_SEPARATOR_S ".thumbnails" G_DIR_SEPARATOR_S) != NULL)
                  && (size >= 36) && thumbnail_needs_frame (pixbuf, width, height);
 
-      /* be sure to make framed thumbnails fit into the size */
       if (G_LIKELY (needs_frame))
         {
-          max_width = size - (3 + 6);
-          max_height = size - (3 + 6);
+          max_width = MAX (size - (3 + 6), 1);
+          max_height = MAX (size - (3 + 6), 1);
         }
       else
         {
@@ -466,11 +468,27 @@ thunar_icon_factory_load_from_file (ThunarIconFactory *factory,
           max_height = size;
         }
 
-      /* scale down the icon (if required) */
+      /* perform the scaling first (if required) */
       if (G_LIKELY (width > max_width || height > max_height))
         {
+          /* determine which axis needs to be scaled down more */
+          gdouble wratio = (gdouble) width / (gdouble) max_width;
+          gdouble hratio = (gdouble) height / (gdouble) max_height;
+
+          /* adjust along both axes */
+          if (hratio > wratio)
+            {
+              width = rint (width / hratio);
+              height = max_height;
+            }
+          else
+            {
+              height = rint (height / wratio);
+              width = max_width;
+            }
+
           /* scale down to the required size */
-          tmp = exo_gdk_pixbuf_scale_down (pixbuf, TRUE, max_height, max_height);
+          tmp = gdk_pixbuf_scale_simple (pixbuf, width, height, GDK_INTERP_BILINEAR);
           g_object_unref (G_OBJECT (pixbuf));
           pixbuf = tmp;
         }
