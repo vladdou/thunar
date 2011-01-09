@@ -1,7 +1,7 @@
 /* $Id$ */
 /*-
  * Copyright (c) 2005-2006 Benedikt Meurer <benny@xfce.org>
- * Copyright (c) 2009-2010 Jannis Pohlmann <jannis@xfce.org>
+ * Copyright (c) 2009-2011 Jannis Pohlmann <jannis@xfce.org>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the Free
@@ -828,7 +828,7 @@ thunar_icon_factory_load_file_icon (ThunarIconFactory  *factory,
     }
 
   /* check if thumbnails are enabled and we can display a thumbnail for the item */
-  if (G_LIKELY (factory->show_thumbnails && thunar_file_is_regular (file)))
+  if (G_LIKELY (factory->show_thumbnails))
     {
       /* this is how thumbnails for files are loaded: first, we check the thumbnail
        * state. If that is unknown, we request a thumbnail to be generated in the
