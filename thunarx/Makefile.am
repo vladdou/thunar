@@ -10,6 +10,8 @@ INCLUDES =								\
 libthunarx_headers =							\
 	thunarx.h							\
 	thunarx-config.h						\
+	thunarx-desktop-view-provider.h					\
+	thunarx-desktop-view.h						\
 	thunarx-file-info.h						\
 	thunarx-menu-provider.h						\
 	thunarx-preferences-provider.h					\
@@ -32,6 +34,8 @@ lib_LTLIBRARIES =							\
 libthunarx_2_la_SOURCES =						\
 	$(libthunarx_headers)						\
 	thunarx-config.c						\
+	thunarx-desktop-view-provider.c					\
+	thunarx-desktop-view.c						\
 	thunarx-file-info.c						\
 	thunarx-menu-provider.c						\
 	thunarx-preferences-provider.c					\
