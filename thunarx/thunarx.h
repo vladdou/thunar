@@ -24,6 +24,8 @@
 #define THUNARX_INSIDE_THUNARX_H
 
 #include <thunarx/thunarx-config.h>
+#include <thunarx/thunarx-desktop-view-provider.h>
+#include <thunarx/thunarx-desktop-view.h>
 #include <thunarx/thunarx-file-info.h>
 #include <thunarx/thunarx-menu-provider.h>
 #include <thunarx/thunarx-preferences-provider.h>

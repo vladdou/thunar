@@ -1,22 +1,23 @@
-/* $Id$ */
+/* vi:set et ai sw=2 sts=2 ts=2: */
 /*-
  * Copyright (c) 2005-2011 os-cillation e.K.
+ *   written by Benedikt Meurer <benny@xfce.org>
+ * Copyright (c) 2011 Jannis Pohlmann <jannis@xfce.org>
  *
- * Written by Benedikt Meurer <benny@xfce.org>.
+ * This program is free software; you can redistribute it and/or 
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of 
+ * the License, or (at your option) any later version.
  *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation; either version 2 of the License, or (at your option)
- * any later version.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the 
+ * GNU General Public License for more details.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
- * Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU General Public 
+ * License along with this program; if not, write to the Free 
+ * Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -40,6 +41,7 @@
 #include <thunar/thunar-application.h>
 #include <thunar/thunar-dbus-client.h>
 #include <thunar/thunar-dbus-service.h>
+#include <thunar/thunar-desktop.h>
 #include <thunar/thunar-gobject-extensions.h>
 #include <thunar/thunar-private.h>
 #include <thunar/thunar-session-client.h>
@@ -116,6 +118,7 @@ main (int argc, char **argv)
   ThunarDBusService   *dbus_service = NULL;
 #endif
   ThunarApplication   *application;
+  ThunarDesktop       *desktop = NULL;
   GError              *error = NULL;
   gchar               *working_directory;
   gchar              **filenames = NULL;
@@ -275,6 +278,10 @@ error0:
   /* check if the application should run as a daemon */
   if (thunar_application_get_daemon (application))
     {
+      /* start the desktop subsystem that will take over the desktop if
+       * desired so by the user */
+      desktop = g_object_new (THUNAR_TYPE_DESKTOP, NULL);
+
 #ifdef HAVE_DBUS
       /* attach the D-Bus service */
       dbus_service = g_object_new (THUNAR_TYPE_DBUS_SERVICE, NULL);
@@ -292,6 +299,10 @@ error0:
 
   /* enter the main loop */
   gtk_main ();
+
+  /* shut down the desktop subsystem */
+  if (desktop != NULL)
+    g_object_unref (desktop);
 
 #ifdef HAVE_DBUS
   if (dbus_service != NULL)

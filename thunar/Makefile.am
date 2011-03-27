@@ -70,6 +70,8 @@ Thunar_SOURCES =							\
 	thunar-debug.c							\
 	thunar-deep-count-job.h						\
 	thunar-deep-count-job.c						\
+	thunar-desktop.h						\
+	thunar-desktop.c						\
 	thunar-details-view-ui.h					\
 	thunar-details-view.c						\
 	thunar-details-view.h						\
