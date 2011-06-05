@@ -66,6 +66,7 @@ enum
 
 
 
+static void thunar_shortcuts_view_constructed  (GObject      *object);
 static void thunar_shortcuts_view_finalize     (GObject      *object);
 static void thunar_shortcuts_view_get_property (GObject      *object,
                                                 guint         prop_id,
@@ -85,9 +86,10 @@ struct _ThunarShortcutsViewClass
 
 struct _ThunarShortcutsView
 {
-  GtkEventBox           __parent__;
+  GtkEventBox   __parent__;
 
-  ThunarShortcutsModel *model;
+  GtkTreeModel *model;
+  GtkWidget    *expander_box;
 };
 
 
@@ -107,6 +109,7 @@ thunar_shortcuts_view_class_init (ThunarShortcutsViewClass *klass)
   GObjectClass   *gobject_class;
 
   gobject_class = G_OBJECT_CLASS (klass);
+  gobject_class->constructed = thunar_shortcuts_view_constructed;
   gobject_class->finalize = thunar_shortcuts_view_finalize;
   gobject_class->get_property = thunar_shortcuts_view_get_property;
   gobject_class->set_property = thunar_shortcuts_view_set_property;
@@ -114,14 +117,14 @@ thunar_shortcuts_view_class_init (ThunarShortcutsViewClass *klass)
   /**
    * ThunarShortcutsView:model:
    *
-   * The #ThunarShortcutsModel associated with this view.
+   * The #GtkTreeModel associated with this view.
    **/
   g_object_class_install_property (gobject_class,
                                    PROP_MODEL,
                                    g_param_spec_object ("model",
                                                         "model",
                                                         "model",
-                                                        THUNAR_TYPE_SHORTCUTS_MODEL,
+                                                        GTK_TYPE_TREE_MODEL,
                                                         EXO_PARAM_READWRITE |
                                                         G_PARAM_CONSTRUCT));
 
@@ -173,7 +176,47 @@ thunar_shortcuts_view_class_init (ThunarShortcutsViewClass *klass)
 static void
 thunar_shortcuts_view_init (ThunarShortcutsView *view)
 {
+  GtkWidget *alignment;
+
   view->model = NULL;
+
+  alignment = gtk_alignment_new (0.0f, 0.0f, 1.0f, 1.0f);
+  gtk_alignment_set_padding (GTK_ALIGNMENT (alignment), 4, 4, 0, 0);
+  gtk_container_add (GTK_CONTAINER (view), alignment);
+  gtk_widget_show (alignment);
+
+  view->expander_box = gtk_vbox_new (FALSE, 6);
+  gtk_container_add (GTK_CONTAINER (alignment), view->expander_box);
+  gtk_widget_show (view->expander_box);
+}
+
+
+
+static void
+thunar_shortcuts_view_constructed (GObject *object)
+{
+  ThunarShortcutsView *view = THUNAR_SHORTCUTS_VIEW (object);
+  GtkTreeIter          iter;
+  gboolean             valid_iter = FALSE;
+
+  /* chain up to the parent class */
+  (*G_OBJECT_CLASS (thunar_shortcuts_view_parent_class)->constructed) (object);
+
+  /* do nothing if we don't have a model set */
+  if (view->model == NULL)
+    return;
+
+  /* iterate over all items in the shortcuts model */
+  valid_iter = gtk_tree_model_get_iter_first (view->model, &iter);
+  while (valid_iter)
+    {
+      /* TODO read values from the row and create an expander, 
+       * shortcut row or drop placeholder, depending on the 
+       * row values */
+
+      /* advance to the next row */
+      valid_iter = gtk_tree_model_iter_next (view->model, &iter);
+    }
 }
 
 
