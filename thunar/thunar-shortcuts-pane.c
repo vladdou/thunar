@@ -1,20 +1,22 @@
-/* $Id$ */
+/* vi:set et ai sw=2 sts=2 ts=2: */
 /*-
  * Copyright (c) 2005-2006 Benedikt Meurer <benny@xfce.org>
+ * Copyright (c) 2011      Jannis Pohlmann <jannis@xfce.org>
  *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation; either version 2 of the License, or (at your option)
- * any later version.
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
- * Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU General Public
+ * License along with this program; if not, write to the Free
+ * Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -93,15 +95,21 @@ struct _ThunarShortcutsPane
 
 static const GtkActionEntry action_entries[] =
 {
-  { "sendto-shortcuts", THUNAR_STOCK_SHORTCUTS, "", NULL, NULL, G_CALLBACK (thunar_shortcuts_pane_action_shortcuts_add), },
+  { "sendto-shortcuts", THUNAR_STOCK_SHORTCUTS, "", NULL, NULL,
+    G_CALLBACK (thunar_shortcuts_pane_action_shortcuts_add), },
 };
 
 
 
-G_DEFINE_TYPE_WITH_CODE (ThunarShortcutsPane, thunar_shortcuts_pane, GTK_TYPE_SCROLLED_WINDOW,
-    G_IMPLEMENT_INTERFACE (THUNAR_TYPE_NAVIGATOR, thunar_shortcuts_pane_navigator_init)
-    G_IMPLEMENT_INTERFACE (THUNAR_TYPE_COMPONENT, thunar_shortcuts_pane_component_init)
-    G_IMPLEMENT_INTERFACE (THUNAR_TYPE_SIDE_PANE, thunar_shortcuts_pane_side_pane_init))
+G_DEFINE_TYPE_WITH_CODE (ThunarShortcutsPane,
+                         thunar_shortcuts_pane, 
+                         GTK_TYPE_SCROLLED_WINDOW,
+                         G_IMPLEMENT_INTERFACE (THUNAR_TYPE_NAVIGATOR,
+                                                thunar_shortcuts_pane_navigator_init)
+                         G_IMPLEMENT_INTERFACE (THUNAR_TYPE_COMPONENT,
+                                                thunar_shortcuts_pane_component_init)
+                         G_IMPLEMENT_INTERFACE (THUNAR_TYPE_SIDE_PANE,
+                                                thunar_shortcuts_pane_side_pane_init))
 
 
 
@@ -117,11 +125,14 @@ thunar_shortcuts_pane_class_init (ThunarShortcutsPaneClass *klass)
   gobject_class->set_property = thunar_shortcuts_pane_set_property;
 
   /* override ThunarNavigator's properties */
-  g_object_class_override_property (gobject_class, PROP_CURRENT_DIRECTORY, "current-directory");
+  g_object_class_override_property (gobject_class,
+                                    PROP_CURRENT_DIRECTORY, "current-directory");
 
   /* override ThunarComponent's properties */
-  g_object_class_override_property (gobject_class, PROP_SELECTED_FILES, "selected-files");
-  g_object_class_override_property (gobject_class, PROP_UI_MANAGER, "ui-manager");
+  g_object_class_override_property (gobject_class,
+                                    PROP_SELECTED_FILES, "selected-files");
+  g_object_class_override_property (gobject_class,
+                                    PROP_UI_MANAGER, "ui-manager");
 
   /* override ThunarSidePane's properties */
   g_object_class_override_property (gobject_class, PROP_SHOW_HIDDEN, "show-hidden");
@@ -161,24 +172,40 @@ thunar_shortcuts_pane_side_pane_init (ThunarSidePaneIface *iface)
 static void
 thunar_shortcuts_pane_init (ThunarShortcutsPane *shortcuts_pane)
 {
+  GtkWidget *viewport;
+
   /* setup the action group for the shortcuts actions */
   shortcuts_pane->action_group = gtk_action_group_new ("ThunarShortcutsPane");
-  gtk_action_group_set_translation_domain (shortcuts_pane->action_group, GETTEXT_PACKAGE);
-  gtk_action_group_add_actions (shortcuts_pane->action_group, action_entries, G_N_ELEMENTS (action_entries), shortcuts_pane);
+  gtk_action_group_set_translation_domain (shortcuts_pane->action_group,
+                                           GETTEXT_PACKAGE);
+  gtk_action_group_add_actions (shortcuts_pane->action_group, action_entries,
+                                G_N_ELEMENTS (action_entries), shortcuts_pane);
 
   /* configure the GtkScrolledWindow */
   gtk_scrolled_window_set_hadjustment (GTK_SCROLLED_WINDOW (shortcuts_pane), NULL);
   gtk_scrolled_window_set_vadjustment (GTK_SCROLLED_WINDOW (shortcuts_pane), NULL);
-  gtk_scrolled_window_set_shadow_type (GTK_SCROLLED_WINDOW (shortcuts_pane), GTK_SHADOW_IN);
-  gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (shortcuts_pane), GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
+  gtk_scrolled_window_set_shadow_type (GTK_SCROLLED_WINDOW (shortcuts_pane),
+                                       GTK_SHADOW_IN);
+  gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (shortcuts_pane),
+                                  GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
+
+  /* create a viewport for the shortcuts view */
+  viewport = gtk_viewport_new (NULL, NULL);
+  gtk_viewport_set_shadow_type (GTK_VIEWPORT (viewport), GTK_SHADOW_NONE);
+  gtk_container_add (GTK_CONTAINER (shortcuts_pane), viewport);
+  gtk_widget_show (viewport);
 
   /* allocate the shortcuts view */
   shortcuts_pane->view = thunar_shortcuts_view_new ();
-  gtk_container_add (GTK_CONTAINER (shortcuts_pane), shortcuts_pane->view);
+  gtk_container_add (GTK_CONTAINER (viewport), shortcuts_pane->view);
   gtk_widget_show (shortcuts_pane->view);
 
+#if 0
   /* connect the "shortcut-activated" signal */
-  g_signal_connect_swapped (G_OBJECT (shortcuts_pane->view), "shortcut-activated", G_CALLBACK (thunar_navigator_change_directory), shortcuts_pane);
+  g_signal_connect_swapped (G_OBJECT (shortcuts_pane->view), "shortcut-activated",
+                            G_CALLBACK (thunar_navigator_change_directory),
+                            shortcuts_pane);
+#endif
 }
 
 
@@ -216,22 +243,31 @@ thunar_shortcuts_pane_get_property (GObject    *object,
                                     GValue     *value,
                                     GParamSpec *pspec)
 {
+  GtkUIManager *ui_manager;
+  ThunarFile   *directory;
+  gboolean      show_hidden;
+  GList        *selected_files;
+
   switch (prop_id)
     {
     case PROP_CURRENT_DIRECTORY:
-      g_value_set_object (value, thunar_navigator_get_current_directory (THUNAR_NAVIGATOR (object)));
+      directory = thunar_navigator_get_current_directory (THUNAR_NAVIGATOR (object));
+      g_value_set_object (value, directory);
       break;
 
     case PROP_SELECTED_FILES:
-      g_value_set_boxed (value, thunar_component_get_selected_files (THUNAR_COMPONENT (object)));
+      selected_files = thunar_component_get_selected_files (THUNAR_COMPONENT (object));
+      g_value_set_boxed (value, selected_files);
       break;
 
     case PROP_SHOW_HIDDEN:
-      g_value_set_boolean (value, thunar_side_pane_get_show_hidden (THUNAR_SIDE_PANE (object)));
+      show_hidden = thunar_side_pane_get_show_hidden (THUNAR_SIDE_PANE (object));
+      g_value_set_boolean (value, show_hidden);
       break;
 
     case PROP_UI_MANAGER:
-      g_value_set_object (value, thunar_component_get_ui_manager (THUNAR_COMPONENT (object)));
+      ui_manager = thunar_component_get_ui_manager (THUNAR_COMPONENT (object));
+      g_value_set_object (value, ui_manager);
       break;
 
     default:
@@ -251,19 +287,23 @@ thunar_shortcuts_pane_set_property (GObject      *object,
   switch (prop_id)
     {
     case PROP_CURRENT_DIRECTORY:
-      thunar_navigator_set_current_directory (THUNAR_NAVIGATOR (object), g_value_get_object (value));
+      thunar_navigator_set_current_directory (THUNAR_NAVIGATOR (object),
+                                              g_value_get_object (value));
       break;
 
     case PROP_SELECTED_FILES:
-      thunar_component_set_selected_files (THUNAR_COMPONENT (object), g_value_get_boxed (value));
+      thunar_component_set_selected_files (THUNAR_COMPONENT (object),
+                                           g_value_get_boxed (value));
       break;
 
     case PROP_SHOW_HIDDEN:
-      thunar_side_pane_set_show_hidden (THUNAR_SIDE_PANE (object), g_value_get_boolean (value));
+      thunar_side_pane_set_show_hidden (THUNAR_SIDE_PANE (object),
+                                        g_value_get_boolean (value));
       break;
 
     case PROP_UI_MANAGER:
-      thunar_component_set_ui_manager (THUNAR_COMPONENT (object), g_value_get_object (value));
+      thunar_component_set_ui_manager (THUNAR_COMPONENT (object),
+                                       g_value_get_object (value));
       break;
 
     default:
@@ -302,7 +342,8 @@ thunar_shortcuts_pane_set_current_directory (ThunarNavigator *navigator,
       g_object_ref (G_OBJECT (current_directory));
 
       /* select the file in the view (if possible) */
-      thunar_shortcuts_view_select_by_file (THUNAR_SHORTCUTS_VIEW (shortcuts_pane->view), current_directory);
+      thunar_shortcuts_view_select_by_file (THUNAR_SHORTCUTS_VIEW (shortcuts_pane->view),
+                                            current_directory);
     }
 
   /* notify listeners */
@@ -342,17 +383,24 @@ thunar_shortcuts_pane_set_selected_files (ThunarComponent *component,
       break;
 
   /* change the visibility of the "shortcuts-add" action appropriately */
-  action = gtk_action_group_get_action (shortcuts_pane->action_group, "sendto-shortcuts");
+  action = gtk_action_group_get_action (shortcuts_pane->action_group,
+                                        "sendto-shortcuts");
   if (lp == NULL && selected_files != NULL)
     {
-      /* check if atleast one of the selected folders is not already present in the model */
+      /* check if atleast one of the selected folders is not 
+       * already present in the model */
       model = gtk_tree_view_get_model (GTK_TREE_VIEW (shortcuts_pane->view));
       if (G_LIKELY (model != NULL))
         {
           /* check all selected folders */
           for (lp = selected_files; lp != NULL; lp = lp->next)
-            if (!thunar_shortcuts_model_iter_for_file (THUNAR_SHORTCUTS_MODEL (model), lp->data, &iter))
-              break;
+            {
+              if (!thunar_shortcuts_model_iter_for_file (THUNAR_SHORTCUTS_MODEL (model),
+                                                       lp->data, &iter))
+                {
+                  break;
+                }
+            }
         }
 
       /* display the action and change the label appropriately */
@@ -395,7 +443,8 @@ thunar_shortcuts_pane_set_ui_manager (ThunarComponent *component,
   if (G_UNLIKELY (shortcuts_pane->ui_manager != NULL))
     {
       /* drop our action group from the previous UI manager */
-      gtk_ui_manager_remove_action_group (shortcuts_pane->ui_manager, shortcuts_pane->action_group);
+      gtk_ui_manager_remove_action_group (shortcuts_pane->ui_manager,
+                                          shortcuts_pane->action_group);
 
       /* unmerge our ui controls from the previous UI manager */
       gtk_ui_manager_remove_ui (shortcuts_pane->ui_manager, shortcuts_pane->ui_merge_id);
@@ -417,7 +466,9 @@ thunar_shortcuts_pane_set_ui_manager (ThunarComponent *component,
       gtk_ui_manager_insert_action_group (ui_manager, shortcuts_pane->action_group, -1);
 
       /* merge our UI control items with the new manager */
-      shortcuts_pane->ui_merge_id = gtk_ui_manager_add_ui_from_string (ui_manager, thunar_shortcuts_pane_ui, thunar_shortcuts_pane_ui_length, &error);
+      shortcuts_pane->ui_merge_id = 
+        gtk_ui_manager_add_ui_from_string (ui_manager, thunar_shortcuts_pane_ui,
+                                           thunar_shortcuts_pane_ui_length, &error);
       if (G_UNLIKELY (shortcuts_pane->ui_merge_id == 0))
         {
           g_error ("Failed to merge ThunarShortcutsPane menus: %s", error->message);
@@ -451,7 +502,9 @@ thunar_shortcuts_pane_action_shortcuts_add (GtkAction           *action,
         if (G_LIKELY (thunar_file_is_directory (lp->data)))
           {
             /* append the folder to the shortcuts model */
-            path = gtk_tree_path_new_from_indices (gtk_tree_model_iter_n_children (model, NULL), -1);
+            path = gtk_tree_path_new_from_indices (gtk_tree_model_iter_n_children (model,
+                                                                                   NULL),
+                                                   -1);
             thunar_shortcuts_model_add (THUNAR_SHORTCUTS_MODEL (model), path, lp->data);
             gtk_tree_path_free (path);
           }
