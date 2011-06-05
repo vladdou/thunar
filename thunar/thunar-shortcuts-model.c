@@ -1,21 +1,22 @@
-/* $Id$ */
+/* vi:set et ai sw=2 sts=2 ts=2: */
 /*-
  * Copyright (c) 2005-2006 Benedikt Meurer <benny@xfce.org>
- * Copyright (c) 2009 Jannis Pohlmann <jannis@xfce.org>
+ * Copyright (c) 2009-2011 Jannis Pohlmann <jannis@xfce.org>
  *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation; either version 2 of the License, or (at your option)
- * any later version.
+ * This program is free software; you can redistribute it and/or 
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of 
+ * the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the 
+ * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
- * Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU General Public 
+ * License along with this program; if not, write to the Free 
+ * Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -47,6 +48,7 @@
 #define THUNAR_SHORTCUT(obj) ((ThunarShortcut *) (obj))
 
 
+
 /* I don't particularly like this here, but it's shared across a few
  * files. */
 const gchar *_thunar_user_directory_names[9] = {
@@ -55,84 +57,65 @@ const gchar *_thunar_user_directory_names[9] = {
 };
 
 
-typedef struct _ThunarShortcut ThunarShortcut;
+
+typedef struct _ThunarShortcutCategory ThunarShortcutCategory;
+typedef struct _ThunarShortcut         ThunarShortcut;
+
+
 
 typedef enum
 {
-  THUNAR_SHORTCUT_SEPARATOR,
-  THUNAR_SHORTCUT_SYSTEM_DEFINED,
-  THUNAR_SHORTCUT_REMOVABLE_MEDIA,
-  THUNAR_SHORTCUT_USER_DEFINED,
+  THUNAR_SHORTCUT_SYSTEM_VOLUME,
+  THUNAR_SHORTCUT_VOLUME,
+  THUNAR_SHORTCUT_USER_DIRECTORY,
+  THUNAR_SHORTCUT_LOCAL_FILE,
+  THUNAR_SHORTCUT_REMOTE_FILE,
 } ThunarShortcutType;
 
 
 
-static void               thunar_shortcuts_model_tree_model_init    (GtkTreeModelIface         *iface);
-static void               thunar_shortcuts_model_drag_source_init   (GtkTreeDragSourceIface    *iface);
-static void               thunar_shortcuts_model_finalize           (GObject                   *object);
-static GtkTreeModelFlags  thunar_shortcuts_model_get_flags          (GtkTreeModel              *tree_model);
-static gint               thunar_shortcuts_model_get_n_columns      (GtkTreeModel              *tree_model);
-static GType              thunar_shortcuts_model_get_column_type    (GtkTreeModel              *tree_model,
-                                                                     gint                       idx);
-static gboolean           thunar_shortcuts_model_get_iter           (GtkTreeModel              *tree_model,
-                                                                     GtkTreeIter               *iter,
-                                                                     GtkTreePath               *path);
-static GtkTreePath       *thunar_shortcuts_model_get_path           (GtkTreeModel              *tree_model,
-                                                                     GtkTreeIter               *iter);
-static void               thunar_shortcuts_model_get_value          (GtkTreeModel              *tree_model,
-                                                                     GtkTreeIter               *iter,
-                                                                     gint                       column,
-                                                                     GValue                    *value);
-static gboolean           thunar_shortcuts_model_iter_next          (GtkTreeModel              *tree_model,
-                                                                     GtkTreeIter               *iter);
-static gboolean           thunar_shortcuts_model_iter_children      (GtkTreeModel              *tree_model,
-                                                                     GtkTreeIter               *iter,
-                                                                     GtkTreeIter               *parent);
-static gboolean           thunar_shortcuts_model_iter_has_child     (GtkTreeModel              *tree_model,
-                                                                     GtkTreeIter               *iter);
-static gint               thunar_shortcuts_model_iter_n_children    (GtkTreeModel              *tree_model,
-                                                                     GtkTreeIter               *iter);
-static gboolean           thunar_shortcuts_model_iter_nth_child     (GtkTreeModel              *tree_model,
-                                                                     GtkTreeIter               *iter,
-                                                                     GtkTreeIter               *parent,
-                                                                     gint                       n);
-static gboolean           thunar_shortcuts_model_iter_parent        (GtkTreeModel              *tree_model,
-                                                                     GtkTreeIter               *iter,
-                                                                     GtkTreeIter               *child);
-static gboolean           thunar_shortcuts_model_row_draggable      (GtkTreeDragSource         *source,
-                                                                     GtkTreePath               *path);
-static gboolean           thunar_shortcuts_model_drag_data_get      (GtkTreeDragSource         *source,
-                                                                     GtkTreePath               *path,
-                                                                     GtkSelectionData          *selection_data);
-static gboolean           thunar_shortcuts_model_drag_data_delete   (GtkTreeDragSource         *source,
-                                                                     GtkTreePath               *path);
-static void               thunar_shortcuts_model_add_shortcut       (ThunarShortcutsModel      *model,
-                                                                     ThunarShortcut            *shortcut,
-                                                                     GtkTreePath               *path);
-static void               thunar_shortcuts_model_remove_shortcut    (ThunarShortcutsModel      *model,
-                                                                     ThunarShortcut            *shortcut);
-static void               thunar_shortcuts_model_load               (ThunarShortcutsModel      *model);
-static void               thunar_shortcuts_model_save               (ThunarShortcutsModel      *model);
-static void               thunar_shortcuts_model_monitor            (GFileMonitor              *monitor,
-                                                                     GFile                     *file,
-                                                                     GFile                     *other_file,
-                                                                     GFileMonitorEvent          event_type,
-                                                                     gpointer                   user_data);
-static void               thunar_shortcuts_model_file_changed       (ThunarFile                *file,
-                                                                     ThunarShortcutsModel      *model);
-static void               thunar_shortcuts_model_file_destroy       (ThunarFile                *file,
-                                                                     ThunarShortcutsModel      *model);
-static void               thunar_shortcuts_model_volume_added       (GVolumeMonitor            *volume_monitor,
-                                                                     GVolume                   *volume,
-                                                                     ThunarShortcutsModel      *model);
-static void               thunar_shortcuts_model_volume_removed     (GVolumeMonitor            *volume_monitor,
-                                                                     GVolume                   *volume,
-                                                                     ThunarShortcutsModel      *model);
-static void               thunar_shortcuts_model_volume_changed     (GVolumeMonitor            *monitor,
-                                                                     GVolume                   *volume,
-                                                                     ThunarShortcutsModel      *model);
-static void               thunar_shortcut_free                      (ThunarShortcut            *shortcut,
-                                                                     ThunarShortcutsModel      *model);
+static void                    thunar_shortcuts_model_tree_model_init    (GtkTreeModelIface         *iface);
+static void                    thunar_shortcuts_model_finalize           (GObject                   *object);
+static GtkTreeModelFlags       thunar_shortcuts_model_get_flags          (GtkTreeModel              *tree_model);
+static gint                    thunar_shortcuts_model_get_n_columns      (GtkTreeModel              *tree_model);
+static GType                   thunar_shortcuts_model_get_column_type    (GtkTreeModel              *tree_model,
+                                                                          gint                       idx);
+static gboolean                thunar_shortcuts_model_get_iter           (GtkTreeModel              *tree_model,
+                                                                          GtkTreeIter               *iter,
+                                                                          GtkTreePath               *path);
+static GtkTreePath            *thunar_shortcuts_model_get_path           (GtkTreeModel              *tree_model,
+                                                                          GtkTreeIter               *iter);
+static void                    thunar_shortcuts_model_get_value          (GtkTreeModel              *tree_model,
+                                                                          GtkTreeIter               *iter,
+                                                                          gint                       column,
+                                                                          GValue                    *value);
+static gboolean                thunar_shortcuts_model_iter_next          (GtkTreeModel              *tree_model,
+                                                                          GtkTreeIter               *iter);
+static gboolean                thunar_shortcuts_model_iter_children      (GtkTreeModel              *tree_model,
+                                                                          GtkTreeIter               *iter,
+                                                                          GtkTreeIter               *parent);
+static gboolean                thunar_shortcuts_model_iter_has_child     (GtkTreeModel              *tree_model,
+                                                                          GtkTreeIter               *iter);
+static gint                    thunar_shortcuts_model_iter_n_children    (GtkTreeModel              *tree_model,
+                                                                          GtkTreeIter               *iter);
+static gboolean                thunar_shortcuts_model_iter_nth_child     (GtkTreeModel              *tree_model,
+                                                                          GtkTreeIter               *iter,
+                                                                          GtkTreeIter               *parent,
+                                                                          gint                       n);
+static gboolean                thunar_shortcuts_model_iter_parent        (GtkTreeModel              *tree_model,
+                                                                          GtkTreeIter               *iter,
+                                                                          GtkTreeIter               *child);
+static gboolean                thunar_shortcuts_model_parse_path         (ThunarShortcutsModel      *model,
+                                                                          GtkTreePath               *path,
+                                                                          gint                      *category_index,
+                                                                          gint                      *shortcut_index);
+static gboolean                thunar_shortcuts_model_parse_iter         (ThunarShortcutsModel      *model,
+                                                                          GtkTreeIter               *iter,
+                                                                          gint                      *category_index,
+                                                                          gint                      *shortcut_index);
+static ThunarShortcutCategory *thunar_shortcut_category_new              (const gchar               *name);
+static void                    thunar_shortcut_category_free             (ThunarShortcutCategory    *category);
+static void                    thunar_shortcut_free                      (ThunarShortcut            *shortcut);
 
 
 
@@ -145,35 +128,42 @@ struct _ThunarShortcutsModel
 {
   GObject         __parent__;
 
-  /* the model stamp is only used when debugging is
-   * enabled, to make sure we don't accept iterators
-   * generated by another model.
-   */
+  /* the model stamp is only used when debugging is enabled 
+   * in order to make sure we don't accept iterators generated 
+   * by another model */
 #ifndef NDEBUG
   gint            stamp;
 #endif
 
-  GList          *shortcuts;
-  GList          *hidden_volumes;
-  GVolumeMonitor *volume_monitor;
+  GPtrArray      *categories;
+};
 
-  GFileMonitor   *monitor;
+struct _ThunarShortcutCategory
+{
+  gchar     *name;
+  GPtrArray *shortcuts;
 };
 
 struct _ThunarShortcut
 {
   ThunarShortcutType type;
 
+  GIcon              *icon;
+  GIcon              *eject_icon;
+
   gchar              *name;
-  ThunarFile         *file;
+  GFile              *file;
   GVolume            *volume;
+
+  guint               mutable : 1;
+  guint               category : 1;
+  guint               persistent : 1;
 };
 
 
 
 G_DEFINE_TYPE_WITH_CODE (ThunarShortcutsModel, thunar_shortcuts_model, G_TYPE_OBJECT,
-    G_IMPLEMENT_INTERFACE (GTK_TYPE_TREE_MODEL, thunar_shortcuts_model_tree_model_init)
-    G_IMPLEMENT_INTERFACE (GTK_TYPE_TREE_DRAG_SOURCE, thunar_shortcuts_model_drag_source_init))
+    G_IMPLEMENT_INTERFACE (GTK_TYPE_TREE_MODEL, thunar_shortcuts_model_tree_model_init))
 
 
     
@@ -208,138 +198,29 @@ thunar_shortcuts_model_tree_model_init (GtkTreeModelIface *iface)
 
 
 static void
-thunar_shortcuts_model_drag_source_init (GtkTreeDragSourceIface *iface)
-{
-  iface->row_draggable = thunar_shortcuts_model_row_draggable;
-  iface->drag_data_get = thunar_shortcuts_model_drag_data_get;
-  iface->drag_data_delete = thunar_shortcuts_model_drag_data_delete;
-}
-
-
-
-static void
 thunar_shortcuts_model_init (ThunarShortcutsModel *model)
 {
-  ThunarShortcut  *shortcut;
-  GtkTreePath     *path;
-  ThunarFile      *file;
-  GVolume         *volume;
-  GFile           *bookmarks;
-  GFile           *desktop;
-  GFile           *home;
-  GList           *system_paths = NULL;
-  GList           *volumes;
-  GList           *lp;
+  ThunarShortcutCategory *category;
 
 #ifndef NDEBUG
   model->stamp = g_random_int ();
 #endif
 
-  /* connect to the volume monitor */
-  model->volume_monitor = g_volume_monitor_get ();
-  g_signal_connect (model->volume_monitor, "volume-added", G_CALLBACK (thunar_shortcuts_model_volume_added), model);
-  g_signal_connect (model->volume_monitor, "volume-removed", G_CALLBACK (thunar_shortcuts_model_volume_removed), model);
-  g_signal_connect (model->volume_monitor, "volume-changed", G_CALLBACK (thunar_shortcuts_model_volume_changed), model);
+  /* allocate an array for the shortcut categories */
+  model->categories = 
+    g_ptr_array_new_with_free_func ((GDestroyNotify) thunar_shortcut_category_free);
 
-  /* add the home folder to the system paths */
-  home = thunar_g_file_new_for_home ();
-  system_paths = g_list_append (system_paths, g_object_ref (home));
+  /* create the devices category */
+  category = thunar_shortcut_category_new (_("DEVICES"));
+  g_ptr_array_add (model->categories, category);
 
-  /* append the user's desktop folder */
-  desktop = thunar_g_file_new_for_desktop ();
-  if (!g_file_equal (desktop, home))
-    system_paths = g_list_append (system_paths, desktop);
-  else
-    g_object_unref (desktop);
+  /* create the places category */
+  category = thunar_shortcut_category_new (_("PLACES"));
+  g_ptr_array_add (model->categories, category);
 
-  /* append the trash icon if the trash is supported */
-  if (thunar_g_vfs_is_uri_scheme_supported ("trash"))
-    system_paths = g_list_append (system_paths, thunar_g_file_new_for_trash ());
-
-  /* append the root file system */
-  system_paths = g_list_append (system_paths, thunar_g_file_new_for_root ());
-
-  /* append the network icon if browsing the network is supported */
-  if (thunar_g_vfs_is_uri_scheme_supported ("network"))
-    system_paths = g_list_append (system_paths, g_file_new_for_uri ("network://"));
-
-  /* will be used to append the shortcuts to the list */
-  path = gtk_tree_path_new_from_indices (0, -1);
-
-  /* append the system defined items ('Home', 'Trash', 'File System') */
-  for (lp = system_paths; lp != NULL; lp = lp->next)
-    {
-      /* determine the file for the path */
-      file = thunar_file_get (lp->data, NULL);
-      if (G_LIKELY (file != NULL))
-        {
-          /* create the shortcut */
-          shortcut = g_slice_new0 (ThunarShortcut);
-          shortcut->type = THUNAR_SHORTCUT_SYSTEM_DEFINED;
-          shortcut->file = file;
-
-          /* append the shortcut to the list */
-          thunar_shortcuts_model_add_shortcut (model, shortcut, path);
-          gtk_tree_path_next (path);
-        }
-
-      /* release the system defined path */
-      g_object_unref (lp->data);
-    }
-
-  g_list_free (system_paths);
-
-  /* prepend the removable media volumes */
-  volumes = g_volume_monitor_get_volumes (model->volume_monitor);
-  for (lp = volumes; lp != NULL; lp = lp->next)
-    {
-      /* monitor the volume for changes */
-      volume = G_VOLUME (lp->data);
-
-      /* we list only present, removable devices here */
-      if (thunar_g_volume_is_removable (volume) && thunar_g_volume_is_present (volume))
-        {
-          /* generate the shortcut (w/o a file, else we might
-           * prevent the volume from being unmounted)
-           */
-          shortcut = g_slice_new0 (ThunarShortcut);
-          shortcut->type = THUNAR_SHORTCUT_REMOVABLE_MEDIA;
-          shortcut->volume = volume;
-
-          /* link the shortcut to the list */
-          thunar_shortcuts_model_add_shortcut (model, shortcut, path);
-          gtk_tree_path_next (path);
-        }
-      else
-        {
-          /* schedule the volume for later checking, not removable or 
-           * there's no medium present */
-          model->hidden_volumes = g_list_prepend (model->hidden_volumes, volume);
-        }
-    }
-  g_list_free (volumes);
-
-  /* prepend the row separator */
-  shortcut = g_slice_new0 (ThunarShortcut);
-  shortcut->type = THUNAR_SHORTCUT_SEPARATOR;
-  thunar_shortcuts_model_add_shortcut (model, shortcut, path);
-  gtk_tree_path_next (path);
-
-  /* determine the URI to the Gtk+ bookmarks file */
-  bookmarks = g_file_resolve_relative_path (home, ".gtk-bookmarks");
-
-  /* register with the alteration monitor for the bookmarks file */
-  model->monitor = g_file_monitor_file (bookmarks, G_FILE_MONITOR_NONE, NULL, NULL);
-  if (G_LIKELY (model->monitor != NULL))
-    g_signal_connect (model->monitor, "changed", G_CALLBACK (thunar_shortcuts_model_monitor), model);
-
-  /* read the Gtk+ bookmarks file */
-  thunar_shortcuts_model_load (model);
-
-  /* cleanup */
-  g_object_unref (bookmarks);
-  g_object_unref (home);
-  gtk_tree_path_free (path);
+  /* create the network category */
+  category = thunar_shortcut_category_new (_("NETWORK"));
+  g_ptr_array_add (model->categories, category);
 }
 
 
@@ -351,24 +232,8 @@ thunar_shortcuts_model_finalize (GObject *object)
 
   _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_MODEL (model));
 
-  /* free all shortcuts */
-  g_list_foreach (model->shortcuts, (GFunc) thunar_shortcut_free, model);
-  g_list_free (model->shortcuts);
-
-  /* free all hidden volumes */
-  g_list_foreach (model->hidden_volumes, (GFunc) g_object_unref, NULL);
-  g_list_free (model->hidden_volumes);
-
-  /* detach from the file monitor */
-  if (model->monitor != NULL)
-    {
-      g_file_monitor_cancel (model->monitor);
-      g_object_unref (model->monitor);
-    }
-
-  /* unlink from the volume monitor */
-  g_signal_handlers_disconnect_matched (model->volume_monitor, G_SIGNAL_MATCH_DATA, 0, 0, NULL, NULL, model);
-  g_object_unref (model->volume_monitor);
+  /* free shortcut categories and their shortcuts */
+  g_ptr_array_free (model->categories, TRUE);
 
   (*G_OBJECT_CLASS (thunar_shortcuts_model_parent_class)->finalize) (object);
 }
@@ -378,7 +243,7 @@ thunar_shortcuts_model_finalize (GObject *object)
 static GtkTreeModelFlags
 thunar_shortcuts_model_get_flags (GtkTreeModel *tree_model)
 {
-  return GTK_TREE_MODEL_ITERS_PERSIST | GTK_TREE_MODEL_LIST_ONLY;
+  return GTK_TREE_MODEL_ITERS_PERSIST;
 }
 
 
@@ -397,11 +262,14 @@ thunar_shortcuts_model_get_column_type (GtkTreeModel *tree_model,
 {
   switch (idx)
     {
+    case THUNAR_SHORTCUTS_MODEL_COLUMN_ICON:
+      return G_TYPE_ICON;
+
     case THUNAR_SHORTCUTS_MODEL_COLUMN_NAME:
       return G_TYPE_STRING;
 
     case THUNAR_SHORTCUTS_MODEL_COLUMN_FILE:
-      return THUNAR_TYPE_FILE;
+      return G_TYPE_FILE;
 
     case THUNAR_SHORTCUTS_MODEL_COLUMN_VOLUME:
       return G_TYPE_VOLUME;
@@ -409,10 +277,13 @@ thunar_shortcuts_model_get_column_type (GtkTreeModel *tree_model,
     case THUNAR_SHORTCUTS_MODEL_COLUMN_MUTABLE:
       return G_TYPE_BOOLEAN;
 
-    case THUNAR_SHORTCUTS_MODEL_COLUMN_EJECT:
-      return G_TYPE_STRING;
+    case THUNAR_SHORTCUTS_MODEL_COLUMN_EJECT_ICON:
+      return G_TYPE_ICON;
 
-    case THUNAR_SHORTCUTS_MODEL_COLUMN_SEPARATOR:
+    case THUNAR_SHORTCUTS_MODEL_COLUMN_CATEGORY:
+      return G_TYPE_BOOLEAN;
+
+    case THUNAR_SHORTCUTS_MODEL_COLUMN_PERSISTENT:
       return G_TYPE_BOOLEAN;
     }
 
@@ -428,20 +299,21 @@ thunar_shortcuts_model_get_iter (GtkTreeModel *tree_model,
                                  GtkTreePath  *path)
 {
   ThunarShortcutsModel *model = THUNAR_SHORTCUTS_MODEL (tree_model);
-  GList                 *lp;
+  gint                  category_index;
+  gint                  shortcut_index;
 
   _thunar_return_val_if_fail (THUNAR_IS_SHORTCUTS_MODEL (model), FALSE);
-  _thunar_return_val_if_fail (gtk_tree_path_get_depth (path) > 0, FALSE);
+  _thunar_return_val_if_fail (gtk_tree_path_get_depth (path) > 0 && gtk_tree_path_get_depth (path) <= 2, FALSE);
 
-  /* determine the list item for the path */
-  lp = g_list_nth (model->shortcuts, gtk_tree_path_get_indices (path)[0]);
-  if (G_LIKELY (lp != NULL))
-    {
-      GTK_TREE_ITER_INIT (*iter, model->stamp, lp);
-      return TRUE;
-    }
+  /* parse the path and abort if it is invalid */
+  if (!thunar_shortcuts_model_parse_path (model, path, &category_index, &shortcut_index))
+    return FALSE;
 
-  return FALSE;
+  (*iter).stamp = model->stamp;
+  (*iter).user_data = GINT_TO_POINTER (category_index);
+  (*iter).user_data2 = GINT_TO_POINTER (shortcut_index);
+
+  return TRUE;
 }
 
 
@@ -451,17 +323,21 @@ thunar_shortcuts_model_get_path (GtkTreeModel *tree_model,
                                  GtkTreeIter  *iter)
 {
   ThunarShortcutsModel *model = THUNAR_SHORTCUTS_MODEL (tree_model);
-  gint                  idx;
+  gint                  category_index;
+  gint                  shortcut_index;
 
   _thunar_return_val_if_fail (THUNAR_IS_SHORTCUTS_MODEL (model), NULL);
   _thunar_return_val_if_fail (iter->stamp == model->stamp, NULL);
 
-  /* lookup the list item in the shortcuts list */
-  idx = g_list_position (model->shortcuts, iter->user_data);
-  if (G_LIKELY (idx >= 0))
-    return gtk_tree_path_new_from_indices (idx, -1);
+  /* parse the iter and abort if it is invalid */
+  if (!thunar_shortcuts_model_parse_iter (model, iter, &category_index, &shortcut_index))
+    return NULL;
 
-  return NULL;
+  /* create a new tree path from the category and shortcut indices.
+   * note that if the iter refers to a category only, the shortcut 
+   * index will be -1 and thus, the path will be constructed correctly
+   * with only the category index */
+  return gtk_tree_path_new_from_indices (category_index, shortcut_index, -1);
 }
 
 
@@ -472,95 +348,89 @@ thunar_shortcuts_model_get_value (GtkTreeModel *tree_model,
                                   gint          column,
                                   GValue       *value)
 {
-  ThunarShortcut *shortcut;
-  ThunarFile     *file;
-  GMount         *mount;
-  GFile          *mount_point;
+  ThunarShortcutCategory *category;
+  ThunarShortcutsModel   *model = THUNAR_SHORTCUTS_MODEL (tree_model);
+  ThunarShortcut         *shortcut;
+  gint                    category_index;
+  gint                    shortcut_index;
 
-  _thunar_return_if_fail (iter->stamp == THUNAR_SHORTCUTS_MODEL (tree_model)->stamp);
   _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_MODEL (tree_model));
+  _thunar_return_if_fail (iter->stamp == model->stamp);
 
-  /* determine the shortcut for the list item */
-  shortcut = THUNAR_SHORTCUT (((GList *) iter->user_data)->data);
+  if (!thunar_shortcuts_model_parse_iter (model, iter, &category_index, &shortcut_index))
+    _thunar_assert_not_reached ();
+
+  /* get the category and shortcut for the iter */
+  category = g_ptr_array_index (model->categories, category_index);
+  shortcut = shortcut_index < 0 ? NULL : g_ptr_array_index (category->shortcuts, 
+                                                            shortcut_index);
 
   switch (column)
     {
+    case THUNAR_SHORTCUTS_MODEL_COLUMN_ICON:
+      g_value_init (value, G_TYPE_ICON);
+      if (shortcut != NULL)
+        g_value_set_object (value, shortcut->icon);
+      else
+        g_value_set_object (value, NULL);
+      break;
+
     case THUNAR_SHORTCUTS_MODEL_COLUMN_NAME:
       g_value_init (value, G_TYPE_STRING);
-      if (G_UNLIKELY (shortcut->volume != NULL))
-        g_value_take_string (value, g_volume_get_name (shortcut->volume));
-      else if (shortcut->name != NULL)
+      if (shortcut != NULL)
         g_value_set_static_string (value, shortcut->name);
-      else if (shortcut->file != NULL)
-        g_value_set_static_string (value, thunar_file_get_display_name (shortcut->file));
       else
-        g_value_set_static_string (value, "");
+        g_value_set_static_string (value, category->name);
       break;
 
     case THUNAR_SHORTCUTS_MODEL_COLUMN_FILE:
-      g_value_init (value, THUNAR_TYPE_FILE);
-      if (shortcut->volume != NULL && shortcut->file == NULL)
-        {
-          /* determine the mount of the volume */
-          mount = g_volume_get_mount (shortcut->volume);
-          
-          if (G_LIKELY (mount != NULL))
-            {
-              /* the volume is mounted, get the mount point */
-              mount_point = g_mount_get_root (mount);
-
-              /* try to allocate/reference a file pointing to the mount point */
-              file = thunar_file_get (mount_point, NULL);
-              g_value_take_object (value, file);
-
-              /* release resources */
-              g_object_unref (mount_point);
-              g_object_unref (mount);
-            }
-        }
+      g_value_init (value, G_TYPE_FILE);
+      if (shortcut != NULL)
+        g_value_set_object (value, shortcut->file);
       else
-        {
-          g_value_set_object (value, shortcut->file);
-        }
+        g_value_set_object (value, NULL);
       break;
 
     case THUNAR_SHORTCUTS_MODEL_COLUMN_VOLUME:
       g_value_init (value, G_TYPE_VOLUME);
-      g_value_set_object (value, shortcut->volume);
+      if (shortcut != NULL)
+        g_value_set_object (value, shortcut->volume);
+      else
+        g_value_set_object (value, NULL);
       break;
 
     case THUNAR_SHORTCUTS_MODEL_COLUMN_MUTABLE:
       g_value_init (value, G_TYPE_BOOLEAN);
-      g_value_set_boolean (value, shortcut->type == THUNAR_SHORTCUT_USER_DEFINED);
-      break;
-
-    case THUNAR_SHORTCUTS_MODEL_COLUMN_EJECT:
-      g_value_init (value, G_TYPE_STRING);
-      if (shortcut->volume != NULL)
-        {
-          if (thunar_g_volume_is_removable (shortcut->volume) 
-              && thunar_g_volume_is_present (shortcut->volume))
-            {
-              g_value_set_static_string (value, "media-eject");
-            }
-          else
-            {
-              g_value_set_static_string (value, "");
-            }
-        }
+      if (shortcut != NULL)
+        g_value_set_boolean (value, shortcut->mutable);
       else
-        {
-          g_value_set_static_string (value, "");
-        }
+        g_value_set_boolean (value, FALSE);
       break;
 
-    case THUNAR_SHORTCUTS_MODEL_COLUMN_SEPARATOR:
+    case THUNAR_SHORTCUTS_MODEL_COLUMN_EJECT_ICON:
+      g_value_init (value, G_TYPE_ICON);
+      if (shortcut != NULL)
+        g_value_set_object (value, shortcut->eject_icon);
+      else
+        g_value_set_object (value, NULL);
+      break;
+
+    case THUNAR_SHORTCUTS_MODEL_COLUMN_CATEGORY:
       g_value_init (value, G_TYPE_BOOLEAN);
-      g_value_set_boolean (value, shortcut->type == THUNAR_SHORTCUT_SEPARATOR);
+      g_value_set_boolean (value, shortcut != NULL);
+      break;
+
+    case THUNAR_SHORTCUTS_MODEL_COLUMN_PERSISTENT:
+      g_value_init (value, G_TYPE_BOOLEAN);
+      if (shortcut != NULL)
+        g_value_set_boolean (value, shortcut->persistent);
+      else
+        g_value_set_boolean (value, FALSE);
       break;
 
     default:
       _thunar_assert_not_reached ();
+      break;
     }
 }
 
@@ -570,11 +440,44 @@ static gboolean
 thunar_shortcuts_model_iter_next (GtkTreeModel *tree_model,
                                   GtkTreeIter  *iter)
 {
-  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUTS_MODEL (tree_model), FALSE);
-  _thunar_return_val_if_fail (iter->stamp == THUNAR_SHORTCUTS_MODEL (tree_model)->stamp, FALSE);
+  ThunarShortcutCategory *category;
+  ThunarShortcutsModel   *model = THUNAR_SHORTCUTS_MODEL (tree_model);
+  ThunarShortcut         *shortcut;
+  gint                    category_index;
+  gint                    shortcut_index;
 
-  iter->user_data = g_list_next (iter->user_data);
-  return (iter->user_data != NULL);
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUTS_MODEL (tree_model), FALSE);
+  _thunar_return_val_if_fail (iter->stamp == model->stamp, FALSE);
+
+  /* parse the iter and abort if it is invalid */
+  if (!thunar_shortcuts_model_parse_iter (model, iter, &category_index, &shortcut_index))
+    return FALSE;
+
+  /* get the category and shortcut for the iter */
+  category = g_ptr_array_index (model->categories, category_index);
+  shortcut = shortcut_index < 0 ? NULL : g_ptr_array_index (category->shortcuts, 
+                                                            shortcut_index);
+
+  if (shortcut != NULL)
+    {
+      /* check if we can advance to another shortcut */
+      if ((guint) shortcut_index < category->shortcuts->len - 1)
+        {
+          (*iter).user_data2 = GINT_TO_POINTER (shortcut_index + 1);
+          return TRUE;
+        }
+    }
+  else
+    {
+      /* check if we can advance to another category */
+      if ((guint) category_index < model->categories->len - 1)
+        {
+          (*iter).user_data = GINT_TO_POINTER (category_index + 1);
+          return TRUE;
+        }
+    }
+
+  return FALSE;
 }
 
 
@@ -584,14 +487,56 @@ thunar_shortcuts_model_iter_children (GtkTreeModel *tree_model,
                                       GtkTreeIter  *iter,
                                       GtkTreeIter  *parent)
 {
-  ThunarShortcutsModel *model = THUNAR_SHORTCUTS_MODEL (tree_model);
+  ThunarShortcutCategory *category;
+  ThunarShortcutsModel   *model = THUNAR_SHORTCUTS_MODEL (tree_model);
+  gint                    category_index;
+  gint                    shortcut_index;
 
-  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUTS_MODEL (model), FALSE);
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUTS_MODEL (tree_model), FALSE);
+  _thunar_return_val_if_fail (parent == NULL || parent->stamp == model->stamp, 0);
 
-  if (G_LIKELY (parent == NULL && model->shortcuts != NULL))
+  /* determine whether to return the first category or the 
+   * first shortcut of a category */
+  if (parent == NULL)
     {
-      GTK_TREE_ITER_INIT (*iter, model->stamp, model->shortcuts);
-      return TRUE;
+      /* check whether we have at least one category to offer */
+      if (model->categories->len > 0)
+        {
+#ifndef NDEBUG
+          (*iter).stamp = model->stamp;
+#endif
+          (*iter).user_data = GINT_TO_POINTER (0);
+          (*iter).user_data2 = GINT_TO_POINTER (-1);
+          return TRUE;
+        }
+    }
+  else
+    {
+      /* parse the parent iter and abort if it is invalid */
+      if (!thunar_shortcuts_model_parse_iter (model, parent, 
+                                              &category_index, &shortcut_index))
+        {
+          return FALSE;
+        }
+
+      /* shortcuts have no children */
+      if (shortcut_index >= 0)
+        return FALSE;
+
+      /* get the category */
+      category = g_ptr_array_index (model->categories, category_index);
+
+      /* check whether we have at least one shortcut to offer 
+       * in the category */
+      if (category->shortcuts->len > 0)
+        {
+#ifndef NDEBUG
+          (*iter).stamp = model->stamp;
+#endif
+          (*iter).user_data = GINT_TO_POINTER (category_index);
+          (*iter).user_data = GINT_TO_POINTER (0);
+          return TRUE;
+        }
     }
 
   return FALSE;
@@ -603,7 +548,27 @@ static gboolean
 thunar_shortcuts_model_iter_has_child (GtkTreeModel *tree_model,
                                        GtkTreeIter  *iter)
 {
-  return FALSE;
+  ThunarShortcutCategory *category;
+  ThunarShortcutsModel   *model = THUNAR_SHORTCUTS_MODEL (tree_model);
+  gint                    category_index;
+  gint                    shortcut_index;
+
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUTS_MODEL (tree_model), FALSE);
+  _thunar_return_val_if_fail (iter->stamp == model->stamp, FALSE);
+
+  /* parse the iter and abort if it is invalid */
+  if (!thunar_shortcuts_model_parse_iter (model, iter, &category_index, &shortcut_index))
+    return FALSE;
+
+  /* shortcuts don't hve children */
+  if (shortcut_index >= 0)
+    return FALSE;
+
+  /* get the category */
+  category = g_ptr_array_index (model->categories, category_index);
+
+  /* check whether the category has at least one shortcut */
+  return category->shortcuts->len > 0;
 }
 
 
@@ -612,11 +577,38 @@ static gint
 thunar_shortcuts_model_iter_n_children (GtkTreeModel *tree_model,
                                         GtkTreeIter  *iter)
 {
-  ThunarShortcutsModel *model = THUNAR_SHORTCUTS_MODEL (tree_model);
+  ThunarShortcutCategory *category;
+  ThunarShortcutsModel   *model = THUNAR_SHORTCUTS_MODEL (tree_model);
+  gint                    category_index;
+  gint                    shortcut_index;
 
-  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUTS_MODEL (model), 0);
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUTS_MODEL (tree_model), 0);
+  _thunar_return_val_if_fail (iter == NULL || iter->stamp == model->stamp, 0);
 
-  return (iter == NULL) ? g_list_length (model->shortcuts) : 0;
+  if (iter == NULL)
+    {
+      /* return the number of categories */
+      return model->categories->len;
+    }
+  else
+    {
+      /* parse the iter and abort if it is invalid */
+      if (!thunar_shortcuts_model_parse_iter (model, iter, 
+                                              &category_index, &shortcut_index))
+        {
+          return 0;
+        }
+
+      /* shortcuts don't hve children */
+      if (shortcut_index >= 0)
+        return 0;
+
+      /* get the category */
+      category = g_ptr_array_index (model->categories, category_index);
+
+      /* return the number of shortcuts of the category */
+      return category->shortcuts->len;
+    }
 }
 
 
@@ -627,17 +619,56 @@ thunar_shortcuts_model_iter_nth_child (GtkTreeModel *tree_model,
                                        GtkTreeIter  *parent,
                                        gint          n)
 {
-  ThunarShortcutsModel *model = THUNAR_SHORTCUTS_MODEL (tree_model);
+  ThunarShortcutCategory *category;
+  ThunarShortcutsModel   *model = THUNAR_SHORTCUTS_MODEL (tree_model);
+  gint                    category_index;
+  gint                    shortcut_index;
 
-  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUTS_MODEL (model), FALSE);
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUTS_MODEL (tree_model), FALSE);
+  _thunar_return_val_if_fail (parent == NULL || parent->stamp == model->stamp, FALSE);
 
-  if (G_LIKELY (parent == NULL))
+  if (iter == NULL)
     {
-      GTK_TREE_ITER_INIT (*iter, model->stamp, g_list_nth (model->shortcuts, n));
-      return (iter->user_data != NULL);
-    }
+      /* check whether we have n categories to offer at all */
+      if ((guint) n >= model->categories->len)
+        return FALSE;
 
-  return FALSE;
+      /* return the nth category */
+#ifndef NDEBUG
+      (*iter).stamp = model->stamp;
+#endif
+      (*iter).user_data = GINT_TO_POINTER (n);
+      (*iter).user_data2 = GINT_TO_POINTER (-1);
+      return TRUE;
+    }
+  else
+    {
+      /* parse the iter and abort if it is invalid */
+      if (!thunar_shortcuts_model_parse_iter (model, parent, 
+                                              &category_index, &shortcut_index))
+        {
+          return FALSE;
+        }
+
+      /* shortcuts don't hve children */
+      if (shortcut_index >= 0)
+        return FALSE;
+
+      /* get the category */
+      category = g_ptr_array_index (model->categories, category_index);
+
+      /* check whether we have n shortcuts to offer at all */
+      if ((guint) n >= category->shortcuts->len)
+        return FALSE;
+
+      /* return the nth shortcut of the category */
+#ifndef NDEBUG
+      (*iter).stamp = model->stamp;
+#endif
+      (*iter).user_data = GINT_TO_POINTER (category_index);
+      (*iter).user_data2 = GINT_TO_POINTER (n);
+      return TRUE;
+    }
 }
 
 
@@ -647,118 +678,158 @@ thunar_shortcuts_model_iter_parent (GtkTreeModel *tree_model,
                                     GtkTreeIter  *iter,
                                     GtkTreeIter  *child)
 {
-  return FALSE;
+  ThunarShortcutsModel *model = THUNAR_SHORTCUTS_MODEL (tree_model);
+  gint                  category_index;
+  gint                  shortcut_index;
+
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUTS_MODEL (tree_model), 0);
+  _thunar_return_val_if_fail (child->stamp == child->stamp, 0);
+
+  /* parse the iter and abort if it is invalid */
+  if (!thunar_shortcuts_model_parse_iter (model, child, 
+                                          &category_index, &shortcut_index))
+    {
+      return FALSE;
+    }
+
+  /* categories don't have a parent */
+  if (shortcut_index < 0)
+    return FALSE;
+
+  /* return an iter for the category */
+#ifndef NDEBUG
+  (*iter).stamp = model->stamp;
+#endif
+  (*iter).user_data = GINT_TO_POINTER (category_index);
+  (*iter).user_data2 = GINT_TO_POINTER (-1);
+  return TRUE;
 }
 
 
 
 static gboolean
-thunar_shortcuts_model_row_draggable (GtkTreeDragSource *source,
-                                      GtkTreePath       *path)
+thunar_shortcuts_model_parse_path (ThunarShortcutsModel *model,
+                                   GtkTreePath          *path,
+                                   gint                 *category_index,
+                                   gint                 *shortcut_index)
 {
-  ThunarShortcutsModel *model = THUNAR_SHORTCUTS_MODEL (source);
-  ThunarShortcut       *shortcut;
+  ThunarShortcutCategory *category;
+  gint                   *indices;
 
   _thunar_return_val_if_fail (THUNAR_IS_SHORTCUTS_MODEL (model), FALSE);
-  _thunar_return_val_if_fail (gtk_tree_path_get_depth (path) > 0, FALSE);
+  _thunar_return_val_if_fail (path != NULL, FALSE);
+  _thunar_return_val_if_fail (gtk_tree_path_get_depth (path) > 0 && gtk_tree_path_get_depth (path) <= 2, FALSE);
 
-  /* lookup the ThunarShortcut for the path */
-  shortcut = g_list_nth_data (model->shortcuts, gtk_tree_path_get_indices (path)[0]);
+  /* read indices from the path */
+  indices = gtk_tree_path_get_indices (path);
 
-  /* special shortcuts cannot be reordered */
-  return (shortcut != NULL && shortcut->type == THUNAR_SHORTCUT_USER_DEFINED);
-}
+  /* abort if the category index is out of range */
+  if (indices[0] < 0 || (guint) indices[0] >= model->categories->len)
+    return FALSE;
 
+  /* set the category index */
+  if (category_index != NULL)
+    *category_index = indices[0];
 
+  /* get the category */
+  category = g_ptr_array_index (model->categories, indices[0]);
+  g_assert (category != NULL);
 
-static gboolean
-thunar_shortcuts_model_drag_data_get (GtkTreeDragSource *source,
-                                      GtkTreePath       *path,
-                                      GtkSelectionData  *selection_data)
-{
-  /* we simply return FALSE here, as the drag handling is done in
-   * the ThunarShortcutsView class.
-   */
-  return FALSE;
-}
-
-
-
-static gboolean
-thunar_shortcuts_model_drag_data_delete (GtkTreeDragSource *source,
-                                         GtkTreePath       *path)
-{
-  /* we simply return FALSE here, as this function can only be
-   * called if the user is re-arranging shortcuts within the
-   * model, which will be handle by the exchange method.
-   */
-  return FALSE;
-}
-
-
-
-static void
-thunar_shortcuts_model_add_shortcut (ThunarShortcutsModel *model,
-                                     ThunarShortcut       *shortcut,
-                                     GtkTreePath          *path)
-{
-  GtkTreeIter iter;
-
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_MODEL (model));
-  _thunar_return_if_fail (shortcut->file == NULL || THUNAR_IS_FILE (shortcut->file));
-  _thunar_return_if_fail (gtk_tree_path_get_depth (path) > 0);
-  _thunar_return_if_fail (gtk_tree_path_get_indices (path)[0] >= 0);
-  _thunar_return_if_fail (gtk_tree_path_get_indices (path)[0] <= (gint) g_list_length (model->shortcuts));
-
-  /* we want to stay informed about changes to the file */
-  if (G_LIKELY (shortcut->file != NULL))
+  /* parse the shortcut information of the path */
+  if (gtk_tree_path_get_depth (path) < 2 || indices[1] < 0)
     {
-      /* watch the file for changes */
-      thunar_file_watch (shortcut->file);
+      /* no shortcut information given, set shortcut index to -1 */
+      if (shortcut_index != NULL)
+        *shortcut_index = -1;
 
-      /* connect appropriate signals */
-      g_signal_connect (G_OBJECT (shortcut->file), "changed",
-                        G_CALLBACK (thunar_shortcuts_model_file_changed), model);
-      g_signal_connect (G_OBJECT (shortcut->file), "destroy",
-                        G_CALLBACK (thunar_shortcuts_model_file_destroy), model);
+      /* we're done */
+      return TRUE;
+    }
+  else
+    {
+      /* abort if the shortcut index is set but out of range */
+      if (indices[1] >= 0 && (guint) indices[1] >= category->shortcuts->len)
+        return FALSE;
+
+      /* valid shortcut index given, return it */
+      if (shortcut_index != NULL)
+        *shortcut_index = indices[1];
+
+      /* we're done */
+      return TRUE;
     }
 
-  /* insert the new shortcut to the shortcuts list */
-  model->shortcuts = g_list_insert (model->shortcuts, shortcut, gtk_tree_path_get_indices (path)[0]);
-
-  /* tell everybody that we have a new shortcut */
-  gtk_tree_model_get_iter (GTK_TREE_MODEL (model), &iter, path);
-  gtk_tree_model_row_inserted (GTK_TREE_MODEL (model), path, &iter);
+  return FALSE;
 }
 
 
 
-static void
-thunar_shortcuts_model_remove_shortcut (ThunarShortcutsModel *model,
-                                        ThunarShortcut       *shortcut)
+static gboolean
+thunar_shortcuts_model_parse_iter (ThunarShortcutsModel *model,
+                                   GtkTreeIter          *iter,
+                                   gint                 *category_index,
+                                   gint                 *shortcut_index)
 {
   GtkTreePath *path;
-  gint         idx;
+  gint         indices[2] = { -1, -1 };
 
-  /* determine the index of the shortcut */
-  idx = g_list_index (model->shortcuts, shortcut);
-  if (G_LIKELY (idx >= 0))
-    {
-      /* unlink the shortcut from the model */
-      model->shortcuts = g_list_remove (model->shortcuts, shortcut);
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUTS_MODEL (model), FALSE);
+  _thunar_return_val_if_fail (iter != NULL, FALSE);
+  _thunar_return_val_if_fail (iter->stamp == model->stamp, FALSE);
 
-      /* tell everybody that we have lost a shortcut */
-      path = gtk_tree_path_new_from_indices (idx, -1);
-      gtk_tree_model_row_deleted (GTK_TREE_MODEL (model), path);
-      gtk_tree_path_free (path);
+  /* read indices from the iter */
+  indices[0] = GPOINTER_TO_INT ((*iter).user_data);
+  indices[1] = GPOINTER_TO_INT ((*iter).user_data2);
 
-      /* actually free the shortcut */
-      thunar_shortcut_free (shortcut, model);
+  /* create a tree path for the indices */
+  path = gtk_tree_path_new_from_indices (indices[0], indices[1], -1);
 
-      /* the shortcuts list was changed, so write the gtk bookmarks file */
-      thunar_shortcuts_model_save (model);
-    }
+  /* re-use the code we have to parse a tree path */
+  return thunar_shortcuts_model_parse_path (model, path, category_index, shortcut_index);
 }
+
+
+
+static ThunarShortcutCategory *
+thunar_shortcut_category_new (const gchar *name)
+{
+  ThunarShortcutCategory *category;
+
+  /* allocate a new category */
+  category = g_slice_new0 (ThunarShortcutCategory);
+
+  /* set its name */
+  category->name = g_strdup (name);
+
+  /* allocate an empty array for the shortcuts in the category */
+  category->shortcuts = 
+    g_ptr_array_new_with_free_func ((GDestroyNotify) thunar_shortcut_free);
+
+  return category;
+}
+
+
+
+static void
+thunar_shortcut_category_free (ThunarShortcutCategory *category)
+{
+  _thunar_return_if_fail (category != NULL);
+
+  /* do nothing if the category has already been released */
+  if (category == NULL)
+    return;
+
+  /* release the category name */
+  g_free (category->name);
+
+  /* release the array of shortcuts */
+  g_ptr_array_free (category->shortcuts, TRUE);
+
+  /* release the category itself */
+  g_slice_free (ThunarShortcutCategory, category);
+}
+
+
 
 /* Reads the current xdg user dirs locale from ~/.config/xdg-user-dirs.locale
  * Notice that the result shall be freed by using g_free (). */
@@ -789,515 +860,29 @@ _thunar_get_xdg_user_dirs_locale (void)
   return locale;
 }
 
-static void
-thunar_shortcuts_model_load (ThunarShortcutsModel *model)
-{
-  ThunarShortcut *shortcut;
-  GtkTreePath     *path;
-  const gchar     *user_special_dir = NULL;
-  ThunarFile      *file;
-  GFile           *file_path;
-  GFile           *home;
-  gchar           *bookmarks_path;
-  gchar            line[2048];
-  gchar           *name;
-  FILE            *fp;
-  gint             i;
-
-  home = thunar_g_file_new_for_home ();
-
-  /* determine the path to the GTK+ bookmarks file */
-  bookmarks_path = xfce_get_homefile (".gtk-bookmarks", NULL);
-
-  /* append the GTK+ bookmarks (if any) */
-  fp = fopen (bookmarks_path, "r");
-  if (G_LIKELY (fp != NULL))
-    {
-      /* allocate a tree path for appending to the model */
-      path = gtk_tree_path_new_from_indices (g_list_length (model->shortcuts), -1);
-
-      while (fgets (line, sizeof (line), fp) != NULL)
-        {
-          /* strip leading/trailing whitespace */
-          g_strstrip (line);
-
-          /* skip over the URI */
-          for (name = line; *name != '\0' && !g_ascii_isspace (*name); ++name)
-            ;
-
-          /* zero-terminate the URI */
-          *name++ = '\0';
-
-          /* check if we have a name */
-          for (; g_ascii_isspace (*name); ++name)
-            ;
-
-          /* parse the URI */
-          file_path = g_file_new_for_uri (line);
-
-          /* try to open the file corresponding to the uri */
-          file = thunar_file_get (file_path, NULL);
-          g_object_unref (file_path);
-
-          if (G_UNLIKELY (file == NULL))
-            continue;
-
-          /* make sure the file refers to a directory */
-          if (G_UNLIKELY (thunar_file_is_directory (file)))
-            {
-              /* create the shortcut entry */
-              shortcut = g_slice_new0 (ThunarShortcut);
-              shortcut->type = THUNAR_SHORTCUT_USER_DEFINED;
-              shortcut->file = file;
-              shortcut->name = (*name != '\0') ? g_strdup (name) : NULL;
-
-              /* append the shortcut to the list */
-              thunar_shortcuts_model_add_shortcut (model, shortcut, path);
-              gtk_tree_path_next (path);
-            }
-          else
-            {
-              g_object_unref (file);
-            }
-        }
-
-      /* clean up */
-      gtk_tree_path_free (path);
-      fclose (fp);
-    }
-  else
-    {
-      /* ~/.gtk-bookmarks wasn't there or it was unreadable.
-       * here we recreate it with some useful xdg user special dirs */
-      const char *old_locale = NULL;
-      gchar *locale          = NULL;
-
-      bindtextdomain (XDG_USER_DIRS_PACKAGE, PACKAGE_LOCALE_DIR);
-#ifdef HAVE_BIND_TEXTDOMAIN_CODESET
-      bind_textdomain_codeset (XDG_USER_DIRS_PACKAGE, "UTF-8");
-#endif /* HAVE_BIND_TEXTDOMAIN_CODESET */
-
-      /* save the old locale */
-      old_locale = setlocale (LC_MESSAGES, NULL);
-
-      /* set the new locale */
-      locale = _thunar_get_xdg_user_dirs_locale ();
-      setlocale (LC_MESSAGES, locale);
-      g_free (locale);
-
-      path = gtk_tree_path_new_from_indices (g_list_length (model->shortcuts), -1);
-      for (i = G_USER_DIRECTORY_DESKTOP;
-           i < G_USER_N_DIRECTORIES && _thunar_user_directory_names[i] != NULL;
-           ++i)
-        {
-          /* let's ignore some directories we don't want in the side pane */
-          if (i == G_USER_DIRECTORY_DESKTOP
-              || i == G_USER_DIRECTORY_PUBLIC_SHARE
-              || i == G_USER_DIRECTORY_TEMPLATES)
-            {
-              continue;
-            }
-
-          user_special_dir = g_get_user_special_dir (i);
-
-          if (G_UNLIKELY (user_special_dir == NULL))
-            continue;
-
-          file_path = g_file_new_for_path (user_special_dir);
-          if (G_UNLIKELY (g_file_equal (file_path, home)))
-            {
-              g_object_unref (file_path);
-              continue;
-            }
-
-          /* try to open the file corresponding to the uri */
-          file = thunar_file_get (file_path, NULL);
-          g_object_unref (file_path);
-
-          if (G_UNLIKELY (file == NULL))
-            continue;
-
-          /* make sure the file refers to a directory */
-          if (G_UNLIKELY (!thunar_file_is_directory (file)))
-            {
-              g_object_unref (file);
-              continue;
-            }
-
-          /* create the shortcut entry */
-          shortcut = g_slice_new0 (ThunarShortcut);
-          shortcut->type = THUNAR_SHORTCUT_USER_DEFINED;
-          shortcut->file = file;
-          shortcut->name = g_strdup (dgettext (XDG_USER_DIRS_PACKAGE, 
-                                               (gchar *) _thunar_user_directory_names[i]));
-
-          /* append the shortcut to the list */
-          thunar_shortcuts_model_add_shortcut (model, shortcut, path);
-          gtk_tree_path_next (path);
-        }
-
-      /* restore the old locale */
-      setlocale (LC_MESSAGES, old_locale);
-
-      gtk_tree_path_free (path);
-
-      /* we try to save the obtained new model */
-      thunar_shortcuts_model_save (model);
-    }
-
-  /* clean up */
-  g_object_unref (home);
-  g_free (bookmarks_path);
-}
-
 
 
 static void
-thunar_shortcuts_model_monitor (GFileMonitor     *monitor,
-                                GFile            *file,
-                                GFile            *other_file,
-                                GFileMonitorEvent event_type,
-                                gpointer          user_data)
+thunar_shortcut_free (ThunarShortcut *shortcut)
 {
-  ThunarShortcutsModel *model = THUNAR_SHORTCUTS_MODEL (user_data);
-  ThunarShortcut       *shortcut;
-  GtkTreePath          *path;
-  GList                *lp;
-  gint                  idx;
+  /* release the shortcut icon */
+  if (shortcut->icon != NULL)
+    g_object_unref (shortcut->icon);
 
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_MODEL (model));
-  _thunar_return_if_fail (model->monitor == monitor);
-
-  /* drop all existing user-defined shortcuts from the model */
-  for (idx = 0, lp = model->shortcuts; lp != NULL; )
-    {
-      /* grab the shortcut */
-      shortcut = THUNAR_SHORTCUT (lp->data);
-
-      /* advance to the next list item */
-      lp = g_list_next (lp);
-
-      /* drop the shortcut if it is user-defined */
-      if (shortcut->type == THUNAR_SHORTCUT_USER_DEFINED)
-        {
-          /* unlink the shortcut from the model */
-          model->shortcuts = g_list_remove (model->shortcuts, shortcut);
-          
-          /* tell everybody that we have lost a shortcut */
-          path = gtk_tree_path_new_from_indices (idx, -1);
-          gtk_tree_model_row_deleted (GTK_TREE_MODEL (model), path);
-          gtk_tree_path_free (path);
-
-          /* actually free the shortcut */
-          thunar_shortcut_free (shortcut, model);
-        }
-      else
-        {
-          ++idx;
-        }
-    }
-
-  /* reload the shortcuts model */
-  thunar_shortcuts_model_load (model);
-}
-
-
-
-static void
-thunar_shortcuts_model_save (ThunarShortcutsModel *model)
-{
-  ThunarShortcut *shortcut;
-  gchar          *bookmarks_path;
-  gchar          *tmp_path;
-  gchar          *uri;
-  GList          *lp;
-  FILE           *fp;
-  gint            fd;
-
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_MODEL (model));
-
-  /* open a temporary file for writing */
-  tmp_path = xfce_get_homefile (".gtk-bookmarks.XXXXXX", NULL);
-  fd = g_mkstemp (tmp_path);
-  if (G_UNLIKELY (fd < 0))
-    {
-      g_warning ("Failed to open `%s' for writing: %s",
-                 tmp_path, g_strerror (errno));
-      g_free (tmp_path);
-      return;
-    }
-
-  /* write the uris of user customizable shortcuts */
-  fp = fdopen (fd, "w");
-  for (lp = model->shortcuts; lp != NULL; lp = lp->next)
-    {
-      shortcut = THUNAR_SHORTCUT (lp->data);
-      if (shortcut->type == THUNAR_SHORTCUT_USER_DEFINED)
-        {
-          uri = g_file_get_uri (thunar_file_get_file (shortcut->file));
-          if (G_LIKELY (shortcut->name != NULL))
-            fprintf (fp, "%s %s\n", uri, shortcut->name);
-          else
-            fprintf (fp, "%s\n", uri);
-          g_free (uri);
-        }
-    }
-
-  /* we're done writing the temporary file */
-  fclose (fp);
-
-  /* move the temporary file to it's final location (atomic writing) */
-  bookmarks_path = xfce_get_homefile (".gtk-bookmarks", NULL);
-  if (rename (tmp_path, bookmarks_path) < 0)
-    {
-      g_warning ("Failed to write `%s': %s",
-                 bookmarks_path, g_strerror (errno));
-      g_unlink (tmp_path);
-    }
-
-  /* cleanup */
-  g_free (bookmarks_path);
-  g_free (tmp_path);
-}
-
-
-
-static void
-thunar_shortcuts_model_file_changed (ThunarFile           *file,
-                                     ThunarShortcutsModel *model)
-{
-  ThunarShortcut *shortcut;
-  GtkTreePath    *path;
-  GtkTreeIter     iter;
-  GList          *lp;
-  gint            idx;
-
-  _thunar_return_if_fail (THUNAR_IS_FILE (file));
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_MODEL (model));
- 
-  /* check if the file still refers to a directory or a not mounted URI, 
-   * otherwise we cannot keep it on the shortcuts list, and so we'll treat 
-   * it like the file was destroyed (and thereby removed) */
-
-  if (G_UNLIKELY (!thunar_file_is_directory (file)))
-    {
-      thunar_shortcuts_model_file_destroy (file, model);
-      return;
-    }
-
-  for (idx = 0, lp = model->shortcuts; lp != NULL; ++idx, lp = lp->next)
-    {
-      shortcut = THUNAR_SHORTCUT (lp->data);
-      if (shortcut->file == file)
-        {
-          GTK_TREE_ITER_INIT (iter, model->stamp, lp);
-
-          path = gtk_tree_path_new_from_indices (idx, -1);
-          gtk_tree_model_row_changed (GTK_TREE_MODEL (model), path, &iter);
-          gtk_tree_path_free (path);
-          break;
-        }
-    }
-}
-
-
-
-static void
-thunar_shortcuts_model_file_destroy (ThunarFile           *file,
-                                     ThunarShortcutsModel *model)
-{
-  ThunarShortcut *shortcut = NULL;
-  GList          *lp;
-
-  _thunar_return_if_fail (THUNAR_IS_FILE (file));
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_MODEL (model));
-
-  /* lookup the shortcut matching the file */
-  for (lp = model->shortcuts; lp != NULL; lp = lp->next)
-    {
-      shortcut = THUNAR_SHORTCUT (lp->data);
-      if (shortcut->file == file)
-        break;
-    }
-
-  /* verify that we actually found a shortcut */
-  _thunar_assert (lp != NULL);
-  _thunar_assert (THUNAR_IS_FILE (shortcut->file));
-
-  /* drop the shortcut from the model */
-  thunar_shortcuts_model_remove_shortcut (model, shortcut);
-}
-
-
-
-static void
-thunar_shortcuts_model_volume_changed (GVolumeMonitor       *volume_monitor,
-                                       GVolume              *volume,
-                                       ThunarShortcutsModel *model)
-{
-  ThunarShortcut *shortcut = NULL;
-  GtkTreePath    *path;
-  GtkTreeIter     iter;
-  GList          *lp;
-  gint            idx;
-
-  _thunar_return_if_fail (G_IS_VOLUME_MONITOR (volume_monitor));
-  _thunar_return_if_fail (model->volume_monitor == volume_monitor);
-  _thunar_return_if_fail (G_IS_VOLUME (volume));
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_MODEL (model));
-
-  /* check if the volume is on the hidden list */
-  lp = g_list_find (model->hidden_volumes, volume);
-  if (lp != NULL)
-    {
-      /* check if we need to display the volume now */
-      if (thunar_g_volume_is_removable (volume) && thunar_g_volume_is_present (volume))
-        {
-          /* remove the volume from the list of hidden volumes */
-          model->hidden_volumes = g_list_delete_link (model->hidden_volumes, lp);
-
-          /* find the insert position */
-          for (idx = 0, lp = model->shortcuts; lp != NULL; ++idx, lp = lp->next)
-            {
-              shortcut = THUNAR_SHORTCUT (lp->data);
-              if (shortcut->type == THUNAR_SHORTCUT_SEPARATOR
-                  || shortcut->type == THUNAR_SHORTCUT_USER_DEFINED)
-                break;
-            }
-
-          /* allocate a new shortcut */
-          shortcut = g_slice_new0 (ThunarShortcut);
-          shortcut->type = THUNAR_SHORTCUT_REMOVABLE_MEDIA;
-          shortcut->volume = volume;
-
-          /* the volume is present now, so we have to display it */
-          path = gtk_tree_path_new_from_indices (idx, -1);
-          thunar_shortcuts_model_add_shortcut (model, shortcut, path);
-          gtk_tree_path_free (path);
-        }
-    }
-  else
-    {
-      /* lookup the shortcut that contains the given volume */
-      for (idx = 0, lp = model->shortcuts; 
-           shortcut == NULL && lp != NULL; 
-           ++idx, lp = lp->next)
-        {
-          if (THUNAR_SHORTCUT (lp->data)->volume == volume)
-            shortcut = lp->data;
-        }
-
-      /* verify that we actually found the shortcut */
-      _thunar_assert (shortcut != NULL);
-      _thunar_assert (shortcut->volume == volume);
-
-      /* check if we need to hide the volume now */
-      if (!thunar_g_volume_is_removable (volume) || !thunar_g_volume_is_present (volume))
-        {
-          /* move the volume to the hidden list */
-          model->hidden_volumes = g_list_prepend (model->hidden_volumes, 
-                                                  g_object_ref (volume));
-
-          /* remove the shortcut from the user interface */
-          thunar_shortcuts_model_remove_shortcut (model, shortcut);
-        }
-      else
-        {
-          /* generate an iterator for the path */
-          GTK_TREE_ITER_INIT (iter, model->stamp, lp);
-
-          /* tell the view that the volume has changed in some way */
-          path = gtk_tree_path_new_from_indices (idx, -1);
-          gtk_tree_model_row_changed (GTK_TREE_MODEL (model), path, &iter);
-          gtk_tree_path_free (path);
-        }
-    }
-}
-
-
-
-static void
-thunar_shortcuts_model_volume_added (GVolumeMonitor       *volume_monitor,
-                                     GVolume              *volume,
-                                     ThunarShortcutsModel *model)
-{
-  _thunar_return_if_fail (G_IS_VOLUME_MONITOR (volume_monitor));
-  _thunar_return_if_fail (model->volume_monitor == volume_monitor);
-  _thunar_return_if_fail (G_IS_VOLUME (volume));
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_MODEL (model));
-
-  /* place the volume on the hidden list */
-  model->hidden_volumes = g_list_prepend (model->hidden_volumes, g_object_ref (volume));
-
-  /* let the "changed" handler place the volume where appropriate */
-  thunar_shortcuts_model_volume_changed (volume_monitor, volume, model);
-}
-
-
-
-static void
-thunar_shortcuts_model_volume_removed (GVolumeMonitor       *volume_monitor,
-                                       GVolume              *volume,
-                                       ThunarShortcutsModel *model)
-{
-  GList *lp;
-
-  _thunar_return_if_fail (G_IS_VOLUME_MONITOR (volume_monitor));
-  _thunar_return_if_fail (model->volume_monitor == volume_monitor);
-  _thunar_return_if_fail (G_IS_VOLUME (volume));
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_MODEL (model));
-  
-  lp = g_list_find (model->hidden_volumes, volume);
-  if (G_LIKELY (lp != NULL))
-    {
-      /* remove the volume from the hidden list and drop our reference */
-      model->hidden_volumes = g_list_delete_link (model->hidden_volumes, lp);
-      g_object_unref (volume);
-    }
-  else
-    {
-      /* must be an active shortcut then... */
-      for (lp = model->shortcuts; lp != NULL; lp = lp->next)
-        if (THUNAR_SHORTCUT (lp->data)->volume == volume)
-          break;
-
-      /* something is broken if we don't have a shortcut here */
-      _thunar_assert (lp != NULL);
-      _thunar_assert (THUNAR_SHORTCUT (lp->data)->volume == volume);
-
-      /* drop the shortcut from the model */
-      thunar_shortcuts_model_remove_shortcut (model, lp->data);
-    }
-}
-
-
-
-static void
-thunar_shortcut_free (ThunarShortcut       *shortcut,
-                      ThunarShortcutsModel *model)
-{
-  if (G_LIKELY (shortcut->file != NULL))
-    {
-      /* drop the file watch */
-      thunar_file_unwatch (shortcut->file);
-
-      /* unregister from the file */
-      g_signal_handlers_disconnect_matched (shortcut->file,
-                                            G_SIGNAL_MATCH_DATA, 0,
-                                            0, NULL, NULL, model);
-      g_object_unref (shortcut->file);
-    }
-
-  if (G_LIKELY (shortcut->volume != NULL))
-    {
-      g_signal_handlers_disconnect_matched (shortcut->volume,
-                                            G_SIGNAL_MATCH_DATA, 0,
-                                            0, NULL, NULL, model);
-      g_object_unref (shortcut->volume);
-    }
+  /* release the eject icon */
+  if (shortcut->eject_icon != NULL)
+    g_object_unref (shortcut->eject_icon);
 
   /* release the shortcut name */
   g_free (shortcut->name);
+
+  /* release the shortcut file */
+  if (shortcut->file != NULL)
+    g_object_unref (shortcut->file);
+
+  /* release the shortcut volume */
+  if (shortcut->volume != NULL)
+    g_object_unref (shortcut->volume);
 
   /* release the shortcut itself */
   g_slice_free (ThunarShortcut, shortcut);
@@ -1333,322 +918,3 @@ thunar_shortcuts_model_get_default (void)
 
   return model;
 }
-
-
-
-/**
- * thunar_shortcuts_model_iter_for_file:
- * @model : a #ThunarShortcutsModel instance.
- * @file  : a #ThunarFile instance.
- * @iter  : pointer to a #GtkTreeIter.
- *
- * Tries to lookup the #GtkTreeIter, that belongs to a shortcut, which
- * refers to @file and stores it to @iter. If no such #GtkTreeIter was
- * found, %FALSE will be returned and @iter won't be changed. Else
- * %TRUE will be returned and @iter will be set appropriately.
- *
- * Return value: %TRUE if @file was found, else %FALSE.
- **/
-gboolean
-thunar_shortcuts_model_iter_for_file (ThunarShortcutsModel *model,
-                                      ThunarFile           *file,
-                                      GtkTreeIter          *iter)
-{
-  GMount *mount;
-  GFile  *mount_point;
-  GList  *lp;
-  
-  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUTS_MODEL (model), FALSE);
-  _thunar_return_val_if_fail (THUNAR_IS_FILE (file), FALSE);
-  _thunar_return_val_if_fail (iter != NULL, FALSE);
-
-  for (lp = model->shortcuts; lp != NULL; lp = lp->next)
-    {
-      /* check if we have a file that matches */
-      if (THUNAR_SHORTCUT (lp->data)->file == file)
-        {
-          GTK_TREE_ITER_INIT (*iter, model->stamp, lp);
-          return TRUE;
-        }
-
-      /* but maybe we have a mounted(!) volume with a matching mount point */
-      if (THUNAR_SHORTCUT (lp->data)->volume != NULL)
-        {
-          mount = g_volume_get_mount (THUNAR_SHORTCUT (lp->data)->volume);
-
-          if (G_LIKELY (mount != NULL))
-            {
-              mount_point = g_mount_get_root (mount);
-
-              if (G_LIKELY (g_file_equal (mount_point, thunar_file_get_file (file))))
-                {
-                  GTK_TREE_ITER_INIT (*iter, model->stamp, lp);
-                  g_object_unref (mount_point);
-                  g_object_unref (mount);
-                  return TRUE;
-                }
-
-              g_object_unref (mount_point);
-              g_object_unref (mount);
-            }
-        }
-    }
-
-  return FALSE;
-}
-
-
-
-/**
- * thunar_shortcuts_model_drop_possible:
- * @model : a #ThunarShortcutstModel.
- * @path  : a #GtkTreePath.
- *
- * Determines whether a drop is possible before the given @path, at the same depth
- * as @path. I.e., can we drop data at that location. @path does not have to exist;
- * the return value will almost certainly be FALSE if the parent of @path doesn't
- * exist, though.
- *
- * Return value: %TRUE if it's possible to drop data before @path, else %FALSE.
- **/
-gboolean
-thunar_shortcuts_model_drop_possible (ThunarShortcutsModel *model,
-                                      GtkTreePath          *path)
-{
-  ThunarShortcut *shortcut;
-
-  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUTS_MODEL (model), FALSE);
-  _thunar_return_val_if_fail (gtk_tree_path_get_depth (path) > 0, FALSE);
-
-  /* determine the list item for the path */
-  shortcut = g_list_nth_data (model->shortcuts, gtk_tree_path_get_indices (path)[0]);
-
-  /* append to the list is always possible */
-  if (G_LIKELY (shortcut == NULL))
-    return TRUE;
-
-  /* cannot drop before special shortcuts! */
-  return (shortcut->type == THUNAR_SHORTCUT_USER_DEFINED);
-}
-
-
-
-/**
- * thunar_shortcuts_model_add:
- * @model    : a #ThunarShortcutsModel.
- * @dst_path : the destination path.
- * @file     : the #ThunarFile that should be added to the shortcuts list.
- *
- * Adds the shortcut @file to the @model at @dst_path, unless @file is
- * already present in @model in which case no action is performed.
- **/
-void
-thunar_shortcuts_model_add (ThunarShortcutsModel *model,
-                            GtkTreePath          *dst_path,
-                            ThunarFile           *file)
-{
-  ThunarShortcut *shortcut;
-  GList           *lp;
-
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_MODEL (model));
-  _thunar_return_if_fail (gtk_tree_path_get_depth (dst_path) > 0);
-  _thunar_return_if_fail (gtk_tree_path_get_indices (dst_path)[0] >= 0);
-  _thunar_return_if_fail (gtk_tree_path_get_indices (dst_path)[0] <= (gint) g_list_length (model->shortcuts));
-  _thunar_return_if_fail (THUNAR_IS_FILE (file));
-
-  /* verify that the file is not already in use as shortcut */
-  for (lp = model->shortcuts; lp != NULL; lp = lp->next)
-    if (THUNAR_SHORTCUT (lp->data)->file == file)
-      return;
-
-  /* create the new shortcut that will be inserted */
-  shortcut = g_slice_new0 (ThunarShortcut);
-  shortcut->type = THUNAR_SHORTCUT_USER_DEFINED;
-  shortcut->file = g_object_ref (G_OBJECT (file));
-
-  /* add the shortcut to the list at the given position */
-  thunar_shortcuts_model_add_shortcut (model, shortcut, dst_path);
-
-  /* the shortcuts list was changed, so write the gtk bookmarks file */
-  thunar_shortcuts_model_save (model);
-}
-
-
-
-/**
- * thunar_shortcuts_model_move:
- * @model    : a #ThunarShortcutsModel.
- * @src_path : the source path.
- * @dst_path : the destination path.
- *
- * Moves the shortcut at @src_path to @dst_path, adjusting other
- * shortcut's positions as required.
- **/
-void
-thunar_shortcuts_model_move (ThunarShortcutsModel *model,
-                             GtkTreePath          *src_path,
-                             GtkTreePath          *dst_path)
-{
-  ThunarShortcut *shortcut;
-  GtkTreePath     *path;
-  GList           *lp;
-  gint            *order;
-  gint             index_src;
-  gint             index_dst;
-  gint             idx;
-
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_MODEL (model));
-  _thunar_return_if_fail (gtk_tree_path_get_depth (src_path) > 0);
-  _thunar_return_if_fail (gtk_tree_path_get_depth (dst_path) > 0);
-  _thunar_return_if_fail (gtk_tree_path_get_indices (src_path)[0] >= 0);
-  _thunar_return_if_fail (gtk_tree_path_get_indices (src_path)[0] < (gint) g_list_length (model->shortcuts));
-  _thunar_return_if_fail (gtk_tree_path_get_indices (dst_path)[0] > 0);
-
-  index_src = gtk_tree_path_get_indices (src_path)[0];
-  index_dst = gtk_tree_path_get_indices (dst_path)[0];
-
-  if (G_UNLIKELY (index_src == index_dst))
-    return;
-
-  /* generate the order for the rows prior the dst/src rows */
-  order = g_newa (gint, g_list_length (model->shortcuts));
-  for (idx = 0, lp = model->shortcuts; idx < index_src && idx < index_dst; ++idx, lp = lp->next)
-    order[idx] = idx;
-
-  if (idx == index_src)
-    {
-      shortcut = THUNAR_SHORTCUT (lp->data);
-
-      for (; idx < index_dst; ++idx, lp = lp->next)
-        {
-          lp->data = lp->next->data;
-          order[idx] = idx + 1;
-        }
-
-      lp->data = shortcut;
-      order[idx++] = index_src;
-    }
-  else
-    {
-      for (; idx < index_src; ++idx, lp = lp->next)
-        ;
-
-      _thunar_assert (idx == index_src);
-
-      shortcut = THUNAR_SHORTCUT (lp->data);
-
-      for (; idx > index_dst; --idx, lp = lp->prev)
-        {
-          lp->data = lp->prev->data;
-          order[idx] = idx - 1;
-        }
-
-      _thunar_assert (idx == index_dst);
-
-      lp->data = shortcut;
-      order[idx] = index_src;
-      idx = index_src + 1;
-    }
-
-  /* generate the remaining order */
-  for (; idx < (gint) g_list_length (model->shortcuts); ++idx)
-    order[idx] = idx;
-
-  /* tell all listeners about the reordering just performed */
-  path = gtk_tree_path_new ();
-  gtk_tree_model_rows_reordered (GTK_TREE_MODEL (model), path, NULL, order);
-  gtk_tree_path_free (path);
-
-  /* the shortcuts list was changed, so write the gtk bookmarks file */
-  thunar_shortcuts_model_save (model);
-}
-
-
-
-/**
- * thunar_shortcuts_model_remove:
- * @model : a #ThunarShortcutsModel.
- * @path  : the #GtkTreePath of the shortcut to remove.
- *
- * Removes the shortcut at @path from the @model and syncs to
- * on-disk storage. @path must refer to a valid, user-defined
- * shortcut, as you cannot remove system-defined entities (they
- * are managed internally).
- **/
-void
-thunar_shortcuts_model_remove (ThunarShortcutsModel *model,
-                               GtkTreePath          *path)
-{
-  ThunarShortcut *shortcut;
-
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_MODEL (model));
-  _thunar_return_if_fail (gtk_tree_path_get_depth (path) > 0);
-  _thunar_return_if_fail (gtk_tree_path_get_indices (path)[0] >= 0);
-  _thunar_return_if_fail (gtk_tree_path_get_indices (path)[0] < (gint) g_list_length (model->shortcuts));
-
-  /* lookup the shortcut for the given path */
-  shortcut = g_list_nth_data (model->shortcuts, gtk_tree_path_get_indices (path)[0]);
-
-  /* verify that the shortcut is removable */
-  _thunar_assert (shortcut->type == THUNAR_SHORTCUT_USER_DEFINED);
-  _thunar_assert (THUNAR_IS_FILE (shortcut->file));
-
-  /* remove the shortcut (using the file destroy handler) */
-  thunar_shortcuts_model_file_destroy (shortcut->file, model);
-}
-
-
-
-/**
- * thunar_shortcuts_model_rename:
- * @model : a #ThunarShortcutsModel.
- * @iter  : the #GtkTreeIter which refers to the shortcut that
- *          should be renamed to @name.
- * @name  : the new name for the shortcut at @path or %NULL to
- *          return to the default name.
- *
- * Renames the shortcut at @iter to the new @name in @model.
- *
- * @name may be %NULL or an empty to reset the shortcut to
- * its default name.
- **/
-void
-thunar_shortcuts_model_rename (ThunarShortcutsModel *model,
-                               GtkTreeIter          *iter,
-                               const gchar          *name)
-{
-  ThunarShortcut *shortcut;
-  GtkTreePath    *path;
-
-  _thunar_return_if_fail (name == NULL || g_utf8_validate (name, -1, NULL));
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_MODEL (model));
-  _thunar_return_if_fail (iter->stamp == model->stamp);
-  _thunar_return_if_fail (iter->user_data != NULL);
-
-  /* lookup the shortcut for the given path */
-  shortcut = THUNAR_SHORTCUT (((GList *) iter->user_data)->data);
-
-  /* verify the shortcut */
-  _thunar_assert (shortcut->type == THUNAR_SHORTCUT_USER_DEFINED);
-  _thunar_assert (THUNAR_IS_FILE (shortcut->file));
-
-  /* perform the rename */
-  if (G_UNLIKELY (shortcut->name != NULL))
-    g_free (shortcut->name);
-  if (G_UNLIKELY (name == NULL || *name == '\0'))
-    shortcut->name = NULL;
-  else
-    shortcut->name = g_strdup (name);
-
-  /* notify the views about the change */
-  path = gtk_tree_model_get_path (GTK_TREE_MODEL (model), iter);
-  gtk_tree_model_row_changed (GTK_TREE_MODEL (model), path, iter);
-  gtk_tree_path_free (path);
-
-  /* save the changes to the model */
-  thunar_shortcuts_model_save (model);
-}
-
-
-
-

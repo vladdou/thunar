@@ -1,20 +1,22 @@
-/* $Id$ */
+/* vi:set et ai sw=2 sts=2 ts=2: */
 /*-
  * Copyright (c) 2005-2006 Benedikt Meurer <benny@xfce.org>
+ * Copyright (c) 2011 Jannis Pohlmann <jannis@xfce.org>
  *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation; either version 2 of the License, or (at your option)
- * any later version.
+ * This program is free software; you can redistribute it and/or 
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of 
+ * the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the 
+ * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
- * Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU General Public 
+ * License along with this program; if not, write to the Free 
+ * Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifndef __THUNAR_SHORTCUTS_MODEL_H__
@@ -22,7 +24,7 @@
 
 #include <thunar/thunar-file.h>
 
-G_BEGIN_DECLS;
+G_BEGIN_DECLS
 
 typedef struct _ThunarShortcutsModelClass ThunarShortcutsModelClass;
 typedef struct _ThunarShortcutsModel      ThunarShortcutsModel;
@@ -36,24 +38,28 @@ typedef struct _ThunarShortcutsModel      ThunarShortcutsModel;
 
 /**
  * ThunarShortcutsModelColumn:
- * @THUNAR_SHORTCUTS_MODEL_COLUMN_NAME      : the index of the name column.
- * @THUNAR_SHORTCUTS_MODEL_COLUMN_FILE      : the index of the file column.
- * @THUNAR_SHORTCUTS_MODEL_COLUMN_VOLUME    : the index of the volume column.
- * @THUNAR_SHORTCUTS_MODEL_COLUMN_MUTABLE   : tells whether a row is mutable.
- * @THUNAR_SHORTCUTS_MODEL_COLUMN_EJECT     : stock icon name for eject symbol
- * @THUNAR_SHORTCUTS_MODEL_COLUMN_SEPARATOR : tells whether a row is a separator.
+ * @THUNAR_SHORTCUTS_MODEL_COLUMN_ICON       : file or volume icon.
+ * @THUNAR_SHORTCUTS_MODEL_COLUMN_NAME       : file or volume display name.
+ * @THUNAR_SHORTCUTS_MODEL_COLUMN_FILE       : the corresponding #GFile object.
+ * @THUNAR_SHORTCUTS_MODEL_COLUMN_VOLUME     : the corresponding #GVolume object.
+ * @THUNAR_SHORTCUTS_MODEL_COLUMN_MUTABLE    : tells whether a row is mutable.
+ * @THUNAR_SHORTCUTS_MODEL_COLUMN_EJECT_ICON : stock icon name for eject symbol.
+ * @THUNAR_SHORTCUTS_MODEL_COLUMN_CATEGORY   : tells whether the row is a category.
+ * @THUNAR_SHORTCUTS_MODEL_COLUMN_PERSISTENT : tells whether the row is persistent.
  *
  * Columns exported by #ThunarShortcutsModel using the
  * #GtkTreeModel interface.
  **/
 typedef enum
 {
+  THUNAR_SHORTCUTS_MODEL_COLUMN_ICON,
   THUNAR_SHORTCUTS_MODEL_COLUMN_NAME,
   THUNAR_SHORTCUTS_MODEL_COLUMN_FILE,
   THUNAR_SHORTCUTS_MODEL_COLUMN_VOLUME,
   THUNAR_SHORTCUTS_MODEL_COLUMN_MUTABLE,
-  THUNAR_SHORTCUTS_MODEL_COLUMN_EJECT,
-  THUNAR_SHORTCUTS_MODEL_COLUMN_SEPARATOR,
+  THUNAR_SHORTCUTS_MODEL_COLUMN_EJECT_ICON,
+  THUNAR_SHORTCUTS_MODEL_COLUMN_CATEGORY,
+  THUNAR_SHORTCUTS_MODEL_COLUMN_PERSISTENT,
   THUNAR_SHORTCUTS_MODEL_N_COLUMNS,
 } ThunarShortcutsModelColumn;
 
@@ -61,25 +67,6 @@ GType                  thunar_shortcuts_model_get_type      (void) G_GNUC_CONST;
 
 ThunarShortcutsModel *thunar_shortcuts_model_get_default    (void);
 
-gboolean               thunar_shortcuts_model_iter_for_file (ThunarShortcutsModel *model,
-                                                             ThunarFile           *file,
-                                                             GtkTreeIter          *iter);
-
-gboolean               thunar_shortcuts_model_drop_possible (ThunarShortcutsModel *model,
-                                                             GtkTreePath          *path);
-
-void                   thunar_shortcuts_model_add           (ThunarShortcutsModel *model,
-                                                             GtkTreePath          *dst_path,
-                                                             ThunarFile           *file);
-void                   thunar_shortcuts_model_move          (ThunarShortcutsModel *model,
-                                                             GtkTreePath          *src_path,
-                                                             GtkTreePath          *dst_path);
-void                   thunar_shortcuts_model_remove        (ThunarShortcutsModel *model,
-                                                             GtkTreePath          *path);
-void                   thunar_shortcuts_model_rename        (ThunarShortcutsModel *model,
-                                                             GtkTreeIter          *iter,
-                                                             const gchar          *name);
-
-G_END_DECLS;
+G_END_DECLS
 
 #endif /* !__THUNAR_SHORTCUTS_MODEL_H__ */

@@ -210,9 +210,17 @@ thunar_shortcuts_view_constructed (GObject *object)
   valid_iter = gtk_tree_model_get_iter_first (view->model, &iter);
   while (valid_iter)
     {
+      gchar *name = NULL;
+
       /* TODO read values from the row and create an expander, 
        * shortcut row or drop placeholder, depending on the 
        * row values */
+      gtk_tree_model_get (view->model, &iter,
+                          THUNAR_SHORTCUTS_MODEL_COLUMN_NAME, &name,
+                          -1);
+
+      g_debug ("name: %s", name);
+      g_free (name);
 
       /* advance to the next row */
       valid_iter = gtk_tree_model_iter_next (view->model, &iter);
@@ -298,6 +306,28 @@ thunar_shortcuts_view_new (void)
   g_object_unref (G_OBJECT (model));
 
   return view;
+}
+
+
+
+gboolean
+thunar_shortcuts_view_has_file (ThunarShortcutsView *view,
+                                ThunarFile          *file)
+{
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view), FALSE);
+  _thunar_return_val_if_fail (THUNAR_IS_FILE (file), FALSE);
+
+  return FALSE;
+}
+
+
+
+void
+thunar_shortcuts_view_add_file (ThunarShortcutsView *view,
+                                ThunarFile          *file)
+{
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
+  _thunar_return_if_fail (THUNAR_IS_FILE (file));
 }
 
 

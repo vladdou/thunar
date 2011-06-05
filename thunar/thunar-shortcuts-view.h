@@ -39,8 +39,12 @@ GType      thunar_shortcuts_view_get_type        (void) G_GNUC_CONST;
 
 GtkWidget *thunar_shortcuts_view_new             (void) G_GNUC_MALLOC;
 
+gboolean   thunar_shortcuts_view_has_file        (ThunarShortcutsView *view,
+                                                  ThunarFile          *file);
+void       thunar_shortcuts_view_add_file        (ThunarShortcutsView *view,
+                                                  ThunarFile          *file);
 void       thunar_shortcuts_view_select_by_file  (ThunarShortcutsView *view,
-                                                  ThunarFile           *file);
+                                                  ThunarFile          *file);
 
 G_END_DECLS
 

@@ -365,9 +365,8 @@ thunar_shortcuts_pane_set_selected_files (ThunarComponent *component,
                                           GList           *selected_files)
 {
   ThunarShortcutsPane *shortcuts_pane = THUNAR_SHORTCUTS_PANE (component);
-  GtkTreeModel        *model;
-  GtkTreeIter          iter;
   GtkAction           *action;
+  gboolean             show_action = FALSE;
   GList               *lp;
   gint                 n;
 
@@ -387,26 +386,20 @@ thunar_shortcuts_pane_set_selected_files (ThunarComponent *component,
                                         "sendto-shortcuts");
   if (lp == NULL && selected_files != NULL)
     {
-      /* check if atleast one of the selected folders is not 
-       * already present in the model */
-      model = gtk_tree_view_get_model (GTK_TREE_VIEW (shortcuts_pane->view));
-      if (G_LIKELY (model != NULL))
+      /* check if at least one of the files is not a bookmark yet */
+      for (lp = selected_files; !show_action && lp != NULL; lp = lp->next)
         {
-          /* check all selected folders */
-          for (lp = selected_files; lp != NULL; lp = lp->next)
+          if (!thunar_shortcuts_view_has_file (THUNAR_SHORTCUTS_VIEW (shortcuts_pane->view),
+                                               lp->data))
             {
-              if (!thunar_shortcuts_model_iter_for_file (THUNAR_SHORTCUTS_MODEL (model),
-                                                       lp->data, &iter))
-                {
-                  break;
-                }
+              show_action = TRUE;
             }
         }
 
       /* display the action and change the label appropriately */
       g_object_set (G_OBJECT (action),
                     "label", ngettext ("Side Pane (Create Shortcut)", "Side Pane (Create Shortcuts)", n),
-                    "sensitive", (lp != NULL),
+                    "sensitive", show_action,
                     "tooltip", ngettext ("Add the selected folder to the shortcuts side pane",
                                          "Add the selected folders to the shortcuts side pane", n),
                     "visible", TRUE,
@@ -486,33 +479,20 @@ static void
 thunar_shortcuts_pane_action_shortcuts_add (GtkAction           *action,
                                             ThunarShortcutsPane *shortcuts_pane)
 {
-  GtkTreeModel *model;
-  GtkTreePath  *path;
-  GList        *lp;
+  GList *lp;
 
   _thunar_return_if_fail (GTK_IS_ACTION (action));
   _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_PANE (shortcuts_pane));
 
-  /* determine the shortcuts model for the view */
-  model = gtk_tree_view_get_model (GTK_TREE_VIEW (shortcuts_pane->view));
-  if (G_LIKELY (model != NULL))
+  /* add all selected folders to the model */
+  for (lp = shortcuts_pane->selected_files; lp != NULL; lp = lp->next)
     {
-      /* add all selected folders to the model */
-      for (lp = shortcuts_pane->selected_files; lp != NULL; lp = lp->next)
-        if (G_LIKELY (thunar_file_is_directory (lp->data)))
-          {
-            /* append the folder to the shortcuts model */
-            path = gtk_tree_path_new_from_indices (gtk_tree_model_iter_n_children (model,
-                                                                                   NULL),
-                                                   -1);
-            thunar_shortcuts_model_add (THUNAR_SHORTCUTS_MODEL (model), path, lp->data);
-            gtk_tree_path_free (path);
-          }
-
-      /* update the user interface to reflect the new action state */
-      lp = thunar_file_list_copy (shortcuts_pane->selected_files);
-      thunar_component_set_selected_files (THUNAR_COMPONENT (shortcuts_pane), lp);
-      thunar_file_list_free (lp);
+      if (G_LIKELY (thunar_file_is_directory (lp->data)))
+        {
+          /* add the folder to the shortcuts model */
+          thunar_shortcuts_view_add_file (THUNAR_SHORTCUTS_VIEW (shortcuts_pane->view),
+                                          lp->data);
+        }
     }
 }
 
