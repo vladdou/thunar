@@ -41,6 +41,7 @@
 #include <thunar/thunar-gtk-extensions.h>
 #include <thunar/thunar-preferences.h>
 #include <thunar/thunar-private.h>
+#include <thunar/thunar-shortcut-row.h>
 #include <thunar/thunar-shortcuts-model.h>
 #include <thunar/thunar-shortcuts-view.h>
 
@@ -66,16 +67,22 @@ enum
 
 
 
-static void thunar_shortcuts_view_constructed  (GObject      *object);
-static void thunar_shortcuts_view_finalize     (GObject      *object);
-static void thunar_shortcuts_view_get_property (GObject      *object,
-                                                guint         prop_id,
-                                                GValue       *value,
-                                                GParamSpec   *pspec);
-static void thunar_shortcuts_view_set_property (GObject      *object,
-                                                guint         prop_id,
-                                                const GValue *value,
-                                                GParamSpec   *pspec);
+static void       thunar_shortcuts_view_constructed     (GObject             *object);
+static void       thunar_shortcuts_view_finalize        (GObject             *object);
+static void       thunar_shortcuts_view_get_property    (GObject             *object,
+                                                         guint                prop_id,
+                                                         GValue              *value,
+                                                         GParamSpec          *pspec);
+static void       thunar_shortcuts_view_set_property    (GObject             *object,
+                                                         guint                prop_id,
+                                                         const GValue        *value,
+                                                         GParamSpec          *pspec);
+static void       thunar_shortcuts_view_row_inserted    (ThunarShortcutsView *view,
+                                                         GtkTreePath         *path,
+                                                         GtkTreeIter         *iter,
+                                                         GtkTreeModel        *model);
+static GtkWidget *thunar_shortcuts_view_get_expander_at (ThunarShortcutsView *view, 
+                                                         gint                 index);
 
 
 
@@ -197,7 +204,13 @@ thunar_shortcuts_view_constructed (GObject *object)
 {
   ThunarShortcutsView *view = THUNAR_SHORTCUTS_VIEW (object);
   GtkTreeIter          iter;
+  const gchar         *markup_format = "<span size='medium' weight='bold' color='#353535'>%s</span>";
+  GtkWidget           *box;
+  GtkWidget           *expander;
+  gboolean             category;
   gboolean             valid_iter = FALSE;
+  gchar               *markup;
+  gchar               *name;
 
   /* chain up to the parent class */
   (*G_OBJECT_CLASS (thunar_shortcuts_view_parent_class)->constructed) (object);
@@ -210,21 +223,50 @@ thunar_shortcuts_view_constructed (GObject *object)
   valid_iter = gtk_tree_model_get_iter_first (view->model, &iter);
   while (valid_iter)
     {
-      gchar *name = NULL;
-
       /* TODO read values from the row and create an expander, 
        * shortcut row or drop placeholder, depending on the 
        * row values */
       gtk_tree_model_get (view->model, &iter,
+                          THUNAR_SHORTCUTS_MODEL_COLUMN_CATEGORY, &category,
                           THUNAR_SHORTCUTS_MODEL_COLUMN_NAME, &name,
                           -1);
 
-      g_debug ("name: %s", name);
-      g_free (name);
+      if (category)
+        {
+          /* create the category expander */
+          expander = gtk_expander_new (NULL);
+          markup = g_markup_printf_escaped (markup_format, name);
+          gtk_expander_set_label (GTK_EXPANDER (expander), markup);
+          g_free (markup);
+          gtk_expander_set_use_markup (GTK_EXPANDER (expander), TRUE);
+          gtk_expander_set_expanded (GTK_EXPANDER (expander), TRUE);
+          gtk_container_set_border_width (GTK_CONTAINER (expander), 0);
+          gtk_expander_set_spacing (GTK_EXPANDER (expander), 0);
+
+          /* add it to the expander box and show it */
+          gtk_box_pack_start (GTK_BOX (view->expander_box), expander, FALSE, TRUE, 0);
+          gtk_widget_show (expander);
+
+          /* create a box for the shortcuts of the category */
+          box = gtk_vbox_new (FALSE, 0);
+          gtk_container_add (GTK_CONTAINER (expander), box);
+          gtk_widget_show (box);
+        }
+      else
+        {
+          /* we will have to implement this at some point but right now, the
+           * model data is loaded in an idle handler, so there is no data other
+           * than categories during construction */
+          _thunar_assert_not_reached ();
+        }
 
       /* advance to the next row */
       valid_iter = gtk_tree_model_iter_next (view->model, &iter);
     }
+
+  /* be notified when a new shortcut is added to the model */
+  g_signal_connect_swapped (view->model, "row-inserted",
+                            G_CALLBACK (thunar_shortcuts_view_row_inserted), view);
 }
 
 
@@ -283,6 +325,105 @@ thunar_shortcuts_view_set_property (GObject      *object,
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
     }
+}
+
+
+
+static void
+thunar_shortcuts_view_row_inserted (ThunarShortcutsView *view,
+                                    GtkTreePath         *path,
+                                    GtkTreeIter         *iter,
+                                    GtkTreeModel        *model)
+{
+  GtkWidget *box;
+  GtkWidget *expander;
+  GtkWidget *shortcut_row;
+  gboolean   category;
+  gboolean   visible;
+  GVolume   *volume;
+  GFile     *file;
+  GIcon     *eject_icon;
+  GIcon     *icon;
+  gchar     *name;
+  gint       category_index;
+  gint       shortcut_index;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
+  _thunar_return_if_fail (path != NULL);
+  _thunar_return_if_fail (iter != NULL);
+  _thunar_return_if_fail (GTK_IS_TREE_MODEL (model) && model == view->model);
+
+  /* read information from the new row */
+  gtk_tree_model_get (model, iter,
+                      THUNAR_SHORTCUTS_MODEL_COLUMN_CATEGORY, &category,
+                      THUNAR_SHORTCUTS_MODEL_COLUMN_ICON, &icon,
+                      THUNAR_SHORTCUTS_MODEL_COLUMN_NAME, &name,
+                      THUNAR_SHORTCUTS_MODEL_COLUMN_FILE, &file,
+                      THUNAR_SHORTCUTS_MODEL_COLUMN_VOLUME, &volume,
+                      THUNAR_SHORTCUTS_MODEL_COLUMN_EJECT_ICON, &eject_icon,
+                      THUNAR_SHORTCUTS_MODEL_COLUMN_VISIBLE, &visible,
+                      -1);
+
+  if (category)
+    {
+      /* we will have to implement this at some point but right now the
+       * categories are hard-coded and will not change */
+      _thunar_assert_not_reached ();
+    }
+  else
+    {
+      /* create a row widget for the shortcut */
+      shortcut_row = thunar_shortcut_row_new (icon, name, eject_icon);
+      thunar_shortcut_row_set_file (THUNAR_SHORTCUT_ROW (shortcut_row), file);
+      thunar_shortcut_row_set_volume (THUNAR_SHORTCUT_ROW (shortcut_row), volume);
+
+      /* get the category and shortcut index */
+      category_index = gtk_tree_path_get_indices (path)[0];
+      shortcut_index = gtk_tree_path_get_indices (path)[1];
+
+      /* find the expander for the row widget */
+      expander = thunar_shortcuts_view_get_expander_at (view, category_index);
+      
+      /* if this fails then we are out of sync with the model */
+      g_assert (expander != NULL);
+
+      /* get the box widget for placing the row */
+      box = gtk_bin_get_child (GTK_BIN (expander));
+
+      /* add the new row to the box and show it */
+      gtk_container_add (GTK_CONTAINER (box), shortcut_row);
+
+      /* move the row to the correct location */
+      gtk_box_reorder_child (GTK_BOX (box), shortcut_row, shortcut_index);
+      
+      /* show the row now (unless it was hidden by the user) */
+      if (visible)
+        gtk_widget_show (shortcut_row);
+    }
+}
+
+
+
+static GtkWidget *
+thunar_shortcuts_view_get_expander_at (ThunarShortcutsView *view, 
+                                       gint                 expander_index)
+{
+  GtkWidget *expander = NULL;
+  GList     *expanders;
+  GList     *lp = NULL;
+
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view), NULL);
+  _thunar_return_val_if_fail (expander_index >= 0, NULL);
+
+  expanders = gtk_container_get_children (GTK_CONTAINER (view->expander_box));
+  
+  lp = g_list_nth (expanders, expander_index);
+  if (lp != NULL)
+    expander = lp->data;
+
+  g_list_free (expanders);
+
+  return expander;
 }
 
 
