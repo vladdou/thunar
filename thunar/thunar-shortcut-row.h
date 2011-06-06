@@ -23,6 +23,8 @@
 
 #include <glib-object.h>
 
+#include <thunar/thunar-enum-types.h>
+
 G_BEGIN_DECLS
 
 #define THUNAR_TYPE_SHORTCUT_ROW            (thunar_shortcut_row_get_type ())
@@ -50,6 +52,8 @@ void       thunar_shortcut_row_set_file       (ThunarShortcutRow *row,
                                                GFile             *file);
 void       thunar_shortcut_row_set_volume     (ThunarShortcutRow *row,
                                                GVolume           *volume);
+void       thunar_shortcut_row_set_icon_size  (ThunarShortcutRow *row,
+                                               ThunarIconSize     icon_size);
 
 G_END_DECLS
 
