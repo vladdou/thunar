@@ -38,7 +38,7 @@
 
 
 
-#define THUNAR_SHORTCUT_ROW_MIN_HEIGHT 24
+#define THUNAR_SHORTCUT_ROW_MIN_HEIGHT 26
 
 
 
@@ -656,7 +656,6 @@ thunar_shortcut_row_size_request (GtkWidget      *widget,
                                   GtkRequisition *requisition)
 {
   ThunarShortcutRow *row = THUNAR_SHORTCUT_ROW (widget);
-  GtkRequisition     button_requisition;
 
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (widget));
 
@@ -665,17 +664,12 @@ thunar_shortcut_row_size_request (GtkWidget      *widget,
 
   g_debug ("computed height: %i", requisition->height);
 
-  /* get the size request of the button */
-  gtk_widget_size_request (row->action_button, &button_requisition);
-
-  g_debug ("  button height: %i", button_requisition.height);
-  g_debug ("  icon size + 4: %i", row->icon_size + 4);
+  g_debug ("  icon size + 2: %i", row->icon_size + 2);
   g_debug ("     min height: %i", THUNAR_SHORTCUT_ROW_MIN_HEIGHT);
 
   /* use the maximum of the computed requisition height, the button height,
    * the icon size + 4, and the minimum allowed height for rows */
-  requisition->height = MAX (requisition->height, button_requisition.height);
-  requisition->height = MAX (requisition->height, (gint) row->icon_size + 4);
+  requisition->height = MAX (requisition->height, (gint) row->icon_size + 2);
   requisition->height = MAX (requisition->height, THUNAR_SHORTCUT_ROW_MIN_HEIGHT);
 
   g_debug ("  => %i", requisition->height);
@@ -964,7 +958,7 @@ thunar_shortcut_row_eject_icon_changed (ThunarShortcutRow *row)
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
 
   /* update the action button image */
-  gtk_image_set_from_gicon (GTK_IMAGE (row->action_image), row->eject_icon,
+  gtk_image_set_from_gicon (GTK_IMAGE (row->action_image), row->eject_icon, 
                             GTK_ICON_SIZE_MENU);
 }
 
@@ -1040,7 +1034,7 @@ thunar_shortcut_row_icon_size_changed (ThunarShortcutRow *row)
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
 
   gtk_image_set_pixel_size (GTK_IMAGE (row->icon_image), row->icon_size);
-  gtk_image_set_pixel_size (GTK_IMAGE (row->action_image), row->icon_size - 2);
+  gtk_image_set_pixel_size (GTK_IMAGE (row->action_image), row->icon_size);
 }
 
 

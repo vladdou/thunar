@@ -1036,25 +1036,12 @@ thunar_shortcuts_model_load_system_shortcuts (gpointer user_data)
   g_object_unref (desktop_file);
   g_object_unref (home_file);
 
-  /* create a trash shortcut */
-  shortcut = g_slice_new0 (ThunarShortcut);
-  shortcut->file = g_object_ref (desktop_file);
-  shortcut->icon = g_themed_icon_new ("user-desktop");
-  shortcut->name = g_strdup (_("Desktop"));
-  shortcut->type = THUNAR_SHORTCUT_USER_DIRECTORY;
-  shortcut->visible = TRUE;
-  shortcut->mutable = FALSE;
-  shortcut->persistent = TRUE;
-
-  /* add the shortcut */
-  thunar_shortcuts_model_add_shortcut (model, shortcut);
-
   /* create a shortcut for the root file system */
   shortcut = g_slice_new0 (ThunarShortcut);
-  shortcut->file = thunar_g_file_new_for_root ();
-  shortcut->icon = g_themed_icon_new ("harddrive");
-  shortcut->name = g_strdup (g_get_host_name ());
-  shortcut->type = THUNAR_SHORTCUT_SYSTEM_VOLUME;
+  shortcut->file = thunar_g_file_new_for_trash ();
+  shortcut->icon = g_themed_icon_new ("user-trash");
+  shortcut->name = g_strdup (_("Trash"));
+  shortcut->type = THUNAR_SHORTCUT_USER_DIRECTORY;
   shortcut->visible = TRUE;
   shortcut->mutable = FALSE;
   shortcut->persistent = TRUE;
