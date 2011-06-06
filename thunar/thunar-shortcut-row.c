@@ -38,7 +38,7 @@
 
 
 
-#define THUNAR_SHORTCUT_ROW_MIN_HEIGHT 26
+#define THUNAR_SHORTCUT_ROW_MIN_HEIGHT 24
 
 
 
@@ -1040,6 +1040,7 @@ thunar_shortcut_row_icon_size_changed (ThunarShortcutRow *row)
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
 
   gtk_image_set_pixel_size (GTK_IMAGE (row->icon_image), row->icon_size);
+  gtk_image_set_pixel_size (GTK_IMAGE (row->action_image), row->icon_size - 2);
 }
 
 
