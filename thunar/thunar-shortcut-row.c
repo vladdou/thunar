@@ -663,14 +663,22 @@ thunar_shortcut_row_size_request (GtkWidget      *widget,
   /* let the event box class compute the size we need for its children */
   (*GTK_WIDGET_CLASS (thunar_shortcut_row_parent_class)->size_request) (widget, requisition);
 
+  g_debug ("computed height: %i", requisition->height);
+
   /* get the size request of the button */
   gtk_widget_size_request (row->action_button, &button_requisition);
+
+  g_debug ("  button height: %i", button_requisition.height);
+  g_debug ("  icon size + 4: %i", row->icon_size + 4);
+  g_debug ("     min height: %i", THUNAR_SHORTCUT_ROW_MIN_HEIGHT);
 
   /* use the maximum of the computed requisition height, the button height,
    * the icon size + 4, and the minimum allowed height for rows */
   requisition->height = MAX (requisition->height, button_requisition.height);
   requisition->height = MAX (requisition->height, (gint) row->icon_size + 4);
   requisition->height = MAX (requisition->height, THUNAR_SHORTCUT_ROW_MIN_HEIGHT);
+
+  g_debug ("  => %i", requisition->height);
 }
 
 
