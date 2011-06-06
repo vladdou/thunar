@@ -227,7 +227,7 @@ thunar_shortcut_row_init (ThunarShortcutRow *row)
   row->action_button = gtk_button_new ();
   gtk_button_set_relief (GTK_BUTTON (row->action_button), GTK_RELIEF_NONE);
   gtk_box_pack_start (GTK_BOX (box), row->action_button, FALSE, TRUE, 0);
-  gtk_widget_show (row->action_button);
+  gtk_widget_hide (row->action_button);
 
   /* adjust the state transitions of the button */
   g_signal_connect_swapped (row->action_button, "state-changed",
