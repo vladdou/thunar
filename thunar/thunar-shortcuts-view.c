@@ -37,6 +37,7 @@
 #include <thunar/thunar-browser.h>
 #include <thunar/thunar-dialogs.h>
 #include <thunar/thunar-dnd.h>
+#include <thunar/thunar-file.h>
 #include <thunar/thunar-gio-extensions.h>
 #include <thunar/thunar-gtk-extensions.h>
 #include <thunar/thunar-preferences.h>
@@ -83,6 +84,12 @@ static void       thunar_shortcuts_view_row_inserted    (ThunarShortcutsView *vi
                                                          GtkTreeModel        *model);
 static GtkWidget *thunar_shortcuts_view_get_expander_at (ThunarShortcutsView *view, 
                                                          gint                 index);
+static void       thunar_shortcuts_view_row_activated   (ThunarShortcutsView *view,
+                                                         ThunarFile          *file,
+                                                         ThunarShortcutRow   *row);
+static void       thunar_shortcuts_view_open            (ThunarShortcutsView *view,
+                                                         ThunarFile          *file,
+                                                         gboolean             new_window);
 
 
 
@@ -135,7 +142,6 @@ thunar_shortcuts_view_class_init (ThunarShortcutsViewClass *klass)
                                                         EXO_PARAM_READWRITE |
                                                         G_PARAM_CONSTRUCT));
 
-#if 0
   /**
    * ThunarShortcutsView:row-activated:
    *
@@ -147,8 +153,9 @@ thunar_shortcuts_view_class_init (ThunarShortcutsViewClass *klass)
                   G_SIGNAL_RUN_LAST,
                   0, NULL, NULL,
                   g_cclosure_marshal_VOID__OBJECT,
-                  G_TYPE_NONE, 1, THUNAR_TYPE_SHORTCUT);
+                  G_TYPE_NONE, 1, THUNAR_TYPE_FILE);
 
+#if 0
   /**
    * ThunarShortcutsView:shortcut-disconnect:
    *
@@ -399,6 +406,10 @@ thunar_shortcuts_view_row_inserted (ThunarShortcutsView *view,
       /* show the row now (unless it was hidden by the user) */
       if (visible)
         gtk_widget_show (shortcut_row);
+
+      /* be notified when the user wishes to open the shortcut */
+      g_signal_connect_swapped (shortcut_row, "activated",
+                                G_CALLBACK (thunar_shortcuts_view_row_activated), view);
     }
 }
 
@@ -424,6 +435,48 @@ thunar_shortcuts_view_get_expander_at (ThunarShortcutsView *view,
   g_list_free (expanders);
 
   return expander;
+}
+
+
+
+static void
+thunar_shortcuts_view_row_activated (ThunarShortcutsView *view,
+                                     ThunarFile          *file,
+                                     ThunarShortcutRow   *row)
+{
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
+  _thunar_return_if_fail (THUNAR_IS_FILE (file));
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
+
+  thunar_shortcuts_view_open (view, file, FALSE);
+}
+
+
+
+static void
+thunar_shortcuts_view_open (ThunarShortcutsView *view,
+                            ThunarFile          *file,
+                            gboolean             new_window)
+{
+  ThunarApplication *application;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
+  _thunar_return_if_fail (THUNAR_IS_FILE (file));
+
+  if (new_window)
+    {
+      /* open the file in a new window */
+      application = thunar_application_get ();
+      thunar_application_open_window (application, file,
+                                      gtk_widget_get_screen (GTK_WIDGET (view)),
+                                      NULL);
+      g_object_unref (application);
+    }
+  else
+    {
+      /* invoke the signal to change to the folder */
+      g_signal_emit (view, view_signals[SHORTCUT_ACTIVATED], 0, file);
+    }
 }
 
 

@@ -27,7 +27,11 @@
 
 #include <exo/exo.h>
 
+#include <thunar/thunar-browser.h>
+#include <thunar/thunar-dialogs.h>
 #include <thunar/thunar-enum-types.h>
+#include <thunar/thunar-file.h>
+#include <thunar/thunar-gio-extensions.h>
 #include <thunar/thunar-preferences.h>
 #include <thunar/thunar-private.h>
 #include <thunar/thunar-shortcut-row.h>
@@ -44,6 +48,15 @@ enum
   PROP_FILE,
   PROP_VOLUME,
   PROP_ICON_SIZE,
+};
+
+
+
+/* signal identifiers */
+enum
+{
+  SIGNAL_ACTIVATED,
+  LAST_SIGNAL,
 };
 
 
@@ -76,6 +89,19 @@ static gboolean thunar_shortcut_row_focus_out_event      (GtkWidget         *wid
 static void     thunar_shortcut_row_button_state_changed (ThunarShortcutRow *row,
                                                           GtkStateType       previous_state,
                                                           GtkWidget         *button);
+static void     thunar_shortcut_row_button_clicked       (ThunarShortcutRow *row,
+                                                          GtkButton         *button);
+static void     thunar_shortcut_row_poke_volume_finish   (ThunarBrowser     *browser,
+                                                          GVolume           *volume,
+                                                          ThunarFile        *file,
+                                                          GError            *error,
+                                                          gpointer           unused);
+static void     thunar_shortcut_row_poke_file_finish     (ThunarBrowser     *browser,
+                                                          ThunarFile        *file,
+                                                          ThunarFile        *target_file,
+                                                          GError            *error,
+                                                          gpointer           unused);
+static void     thunar_shortcut_row_resolve_and_activate (ThunarShortcutRow *row);
 static void     thunar_shortcut_row_icon_changed         (ThunarShortcutRow *row);
 static void     thunar_shortcut_row_label_changed        (ThunarShortcutRow *row);
 static void     thunar_shortcut_row_file_changed         (ThunarShortcutRow *row);
@@ -114,7 +140,12 @@ struct _ThunarShortcutRow
 
 
 
-G_DEFINE_TYPE (ThunarShortcutRow, thunar_shortcut_row, GTK_TYPE_EVENT_BOX)
+G_DEFINE_TYPE_WITH_CODE (ThunarShortcutRow, thunar_shortcut_row, GTK_TYPE_EVENT_BOX,
+                         G_IMPLEMENT_INTERFACE (THUNAR_TYPE_BROWSER, NULL))
+
+
+
+static guint row_signals[LAST_SIGNAL];
 
 
 
@@ -185,6 +216,14 @@ thunar_shortcut_row_class_init (ThunarShortcutRowClass *klass)
                                                       THUNAR_TYPE_ICON_SIZE,
                                                       THUNAR_ICON_SIZE_SMALLER,
                                                       EXO_PARAM_READWRITE));
+
+  row_signals[SIGNAL_ACTIVATED] = g_signal_new (I_("activated"),
+                                                G_TYPE_FROM_CLASS (klass),
+                                                G_SIGNAL_RUN_LAST,
+                                                0, NULL, NULL,
+                                                g_cclosure_marshal_VOID__OBJECT,
+                                                G_TYPE_NONE, 1, THUNAR_TYPE_FILE);
+
 }
 
 
@@ -232,6 +271,10 @@ thunar_shortcut_row_init (ThunarShortcutRow *row)
   /* adjust the state transitions of the button */
   g_signal_connect_swapped (row->action_button, "state-changed",
                             G_CALLBACK (thunar_shortcut_row_button_state_changed), row);
+
+  /* react on button click events */
+  g_signal_connect_swapped (row->action_button, "clicked",
+                            G_CALLBACK (thunar_shortcut_row_button_clicked), row);
 
   /* create the action button image */
   row->action_image = gtk_image_new ();
@@ -345,7 +388,6 @@ thunar_shortcut_row_set_property (GObject      *object,
       break;
 
     case PROP_EJECT_ICON:
-      g_debug ("set eject icon");
       thunar_shortcut_row_set_eject_icon (row, g_value_get_object (value));
       break;
 
@@ -397,6 +439,10 @@ thunar_shortcut_row_button_press_event (GtkWidget      *widget,
           gtk_widget_set_state (widget, GTK_STATE_SELECTED);
           gtk_widget_grab_focus (widget);
         }
+
+      /* resolve (e.g. mount) the shortcut and activate it */
+      if (gtk_widget_get_state (widget) == GTK_STATE_SELECTED)
+        thunar_shortcut_row_resolve_and_activate (THUNAR_SHORTCUT_ROW (widget));
     }
   else if (event->button == 3)
     {
@@ -612,6 +658,110 @@ thunar_shortcut_row_button_state_changed (ThunarShortcutRow *row,
 
 
 static void
+thunar_shortcut_row_button_clicked (ThunarShortcutRow *row,
+                                    GtkButton         *button)
+{
+  g_debug ("left click on the action button");
+}
+
+
+
+static void
+thunar_shortcut_row_poke_volume_finish (ThunarBrowser *browser,
+                                        GVolume       *volume,
+                                        ThunarFile    *file,
+                                        GError        *error,
+                                        gpointer       unused)
+{
+  ThunarShortcutRow *row = THUNAR_SHORTCUT_ROW (browser);
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (browser));
+  _thunar_return_if_fail (G_IS_VOLUME (volume));
+  _thunar_return_if_fail (file == NULL || THUNAR_IS_FILE (file));
+  
+  if (error == NULL)
+    {
+      g_signal_emit (row, row_signals[SIGNAL_ACTIVATED], 0, file);
+    }
+  else
+    {
+      thunar_dialogs_show_error (GTK_WIDGET (row), error,
+                                 _("Failed to open \"%s\""),
+                                 row->label);
+    }
+}
+
+
+
+static void
+thunar_shortcut_row_poke_file_finish (ThunarBrowser *browser,
+                                        ThunarFile    *file,
+                                        ThunarFile    *target_file,
+                                        GError        *error,
+                                        gpointer       unused)
+{
+  ThunarShortcutRow *row = THUNAR_SHORTCUT_ROW (browser);
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (browser));
+  _thunar_return_if_fail (THUNAR_IS_FILE (file));
+  _thunar_return_if_fail (target_file == NULL || THUNAR_IS_FILE (target_file));
+  
+  if (error == NULL)
+    {
+      g_signal_emit (row, row_signals[SIGNAL_ACTIVATED], 0, target_file);
+    }
+  else
+    {
+      thunar_dialogs_show_error (GTK_WIDGET (row), error,
+                                 _("Failed to open \"%s\""),
+                                 row->label);
+    }
+}
+
+
+
+static void
+thunar_shortcut_row_resolve_and_activate (ThunarShortcutRow *row)
+{
+  ThunarFile *file;
+  GError     *error = NULL;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
+
+  if (row->volume != NULL)
+    {
+      thunar_browser_poke_volume (THUNAR_BROWSER (row), row->volume, row,
+                                  thunar_shortcut_row_poke_volume_finish,
+                                  NULL);
+    }
+  else
+    {
+      file = thunar_file_get (row->file, NULL);
+      if (file != NULL)
+        {
+          thunar_browser_poke_file (THUNAR_BROWSER (row), file, row,
+                                    thunar_shortcut_row_poke_file_finish,
+                                    NULL);
+
+          g_object_unref (file);
+        }
+      else
+        {
+          g_set_error (&error, G_IO_ERROR, G_IO_ERROR_UNKNOWN,
+                       _("Folder could not be loaded"));
+
+          thunar_dialogs_show_error (GTK_WIDGET (row), error,
+                                     _("Failed to open \"%s\""),
+                                     row->label);
+
+          g_error_free (error);
+        }
+    }
+}
+
+
+
+static void
 thunar_shortcut_row_icon_changed (ThunarShortcutRow *row)
 {
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
@@ -672,9 +822,8 @@ thunar_shortcut_row_file_changed (ThunarShortcutRow *row)
 static void
 thunar_shortcut_row_volume_changed (ThunarShortcutRow *row)
 {
-  GMount *mount;
-  GIcon  *icon;
-  gchar  *name;
+  GIcon *icon;
+  gchar *name;
 
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
 
@@ -698,10 +847,15 @@ thunar_shortcut_row_volume_changed (ThunarShortcutRow *row)
       g_object_unref (icon);
 
       /* update the action button */
-      mount = g_volume_get_mount (row->volume);
-      gtk_widget_set_visible (row->action_button, mount != NULL);
-      if (mount != NULL)
-        g_object_unref (mount);
+      if (thunar_g_volume_is_removable (row->volume)
+          && thunar_g_volume_is_mounted (row->volume))
+        {
+          gtk_widget_set_visible (row->action_button, TRUE);
+        }
+      else
+        {
+          gtk_widget_set_visible (row->action_button, FALSE);
+        }
     }
 }
 

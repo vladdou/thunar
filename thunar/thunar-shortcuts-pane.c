@@ -200,12 +200,10 @@ thunar_shortcuts_pane_init (ThunarShortcutsPane *shortcuts_pane)
   gtk_container_add (GTK_CONTAINER (viewport), shortcuts_pane->view);
   gtk_widget_show (shortcuts_pane->view);
 
-#if 0
   /* connect the "shortcut-activated" signal */
   g_signal_connect_swapped (G_OBJECT (shortcuts_pane->view), "shortcut-activated",
                             G_CALLBACK (thunar_navigator_change_directory),
                             shortcuts_pane);
-#endif
 }
 
 

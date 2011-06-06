@@ -122,12 +122,14 @@ static gboolean                thunar_shortcuts_model_parse_iter            (Thu
                                                                              gint                      *shortcut_index);
 static gboolean                thunar_shortcuts_model_find_category         (ThunarShortcutsModel      *model,
                                                                              GFile                     *file,
+                                                                             GVolume                   *volume,
                                                                              ThunarShortcutType         type,
                                                                              ThunarShortcutCategory   **category,
                                                                              gint                      *category_index);
 static void                    thunar_shortcuts_model_add_shortcut          (ThunarShortcutsModel      *model,
                                                                              ThunarShortcut            *shortcut);
 static gboolean                thunar_shortcuts_model_load_system_shortcuts (gpointer                   user_data);
+static gboolean                thunar_shortcuts_model_load_volumes          (gpointer                   user_data);
 static ThunarShortcutCategory *thunar_shortcut_category_new                 (ThunarShortcutCategoryType type);
 static void                    thunar_shortcut_category_free                (ThunarShortcutCategory    *category);
 static void                    thunar_shortcut_free                         (ThunarShortcut            *shortcut);
@@ -151,6 +153,10 @@ struct _ThunarShortcutsModel
 #endif
 
   GPtrArray      *categories;
+
+  guint           load_idle_id;
+
+  GVolumeMonitor *volume_monitor;
 };
 
 struct _ThunarShortcutCategory
@@ -240,7 +246,7 @@ thunar_shortcuts_model_init (ThunarShortcutsModel *model)
   g_ptr_array_add (model->categories, category);
 
   /* start the load chain */
-  g_idle_add (thunar_shortcuts_model_load_system_shortcuts, model);
+  model->load_idle_id = g_idle_add (thunar_shortcuts_model_load_system_shortcuts, model);
 }
 
 
@@ -251,6 +257,16 @@ thunar_shortcuts_model_finalize (GObject *object)
   ThunarShortcutsModel *model = THUNAR_SHORTCUTS_MODEL (object);
 
   _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_MODEL (model));
+
+  if (model->load_idle_id != 0)
+    g_source_remove (model->load_idle_id);
+  
+  /* release the volume monitor */
+  if (model->volume_monitor != NULL)
+    {
+      /* TODO disconnect from the monitor signals */
+      g_object_unref (model->volume_monitor);
+    }
 
   /* free shortcut categories and their shortcuts */
   g_ptr_array_free (model->categories, TRUE);
@@ -824,6 +840,7 @@ thunar_shortcuts_model_parse_iter (ThunarShortcutsModel *model,
 static gboolean
 thunar_shortcuts_model_find_category (ThunarShortcutsModel    *model,
                                       GFile                   *file,
+                                      GVolume                 *volume,
                                       ThunarShortcutType       type,
                                       ThunarShortcutCategory **category,
                                       gint                    *category_index)
@@ -853,6 +870,14 @@ thunar_shortcuts_model_find_category (ThunarShortcutsModel    *model,
         case THUNAR_SHORTCUT_CATEGORY_DEVICES:
           /* system volumes belong into devices */
           if (type == THUNAR_SHORTCUT_SYSTEM_VOLUME)
+            item_belongs_here = TRUE;
+
+          /* regular volumes belong into devices as well */
+          if (type == THUNAR_SHORTCUT_VOLUME)
+            item_belongs_here = TRUE;
+
+          /* items with volumes belong here too */
+          if (volume != NULL)
             item_belongs_here = TRUE;
 
           /* check whether we have an archive mountable */
@@ -920,10 +945,11 @@ thunar_shortcuts_model_add_shortcut (ThunarShortcutsModel *model,
   _thunar_return_if_fail (shortcut != NULL);
 
   /* find the destination category for the shortcut */
-  if (!thunar_shortcuts_model_find_category (model, 
-                                             shortcut->file, shortcut->type,
-                                             &category, &category_index))
+  if (!thunar_shortcuts_model_find_category (model, shortcut->file, shortcut->volume,
+                                             shortcut->type, &category, &category_index))
     {
+      g_debug ("failed to add shortcut \"%s\": no category found",
+               shortcut->name);
       return;
     }
 
@@ -1021,8 +1047,60 @@ thunar_shortcuts_model_load_system_shortcuts (gpointer user_data)
   /* add the shortcut */
   thunar_shortcuts_model_add_shortcut (model, shortcut);
 
+  /* load volumes next */
+  model->load_idle_id = g_idle_add (thunar_shortcuts_model_load_volumes, model);
+
   return FALSE;
 }
+
+
+
+static gboolean
+thunar_shortcuts_model_load_volumes (gpointer user_data)
+{
+  ThunarShortcutsModel *model = THUNAR_SHORTCUTS_MODEL (user_data);
+  ThunarShortcut       *shortcut;
+  GList                *volumes;
+  GList                *lp;
+
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUTS_MODEL (model), FALSE);
+
+  /* get the default volume monitor */
+  model->volume_monitor = g_volume_monitor_get ();
+
+  /* get a list of all volumes available */
+  volumes = g_volume_monitor_get_volumes (model->volume_monitor);
+
+  /* create shortcuts for the volumes */
+  for (lp = volumes; lp != NULL; lp = lp->next)
+    {
+      g_debug ("volume: %s", g_volume_get_name (lp->data));
+
+      /* create the shortcut */
+      shortcut = g_slice_new0 (ThunarShortcut);
+      shortcut->volume = lp->data;
+      shortcut->icon = g_volume_get_icon (shortcut->volume);
+      shortcut->eject_icon = g_themed_icon_new ("media-eject");
+      shortcut->name = g_volume_get_name (shortcut->volume);
+      shortcut->type = THUNAR_SHORTCUT_VOLUME;
+      shortcut->visible = TRUE;
+      shortcut->mutable = TRUE;
+      shortcut->persistent = FALSE;
+
+      /* add the shortcut */
+      thunar_shortcuts_model_add_shortcut (model, shortcut);
+    }
+
+  /* release the volume list */
+  g_list_free (volumes);
+
+  /* TODO be notified of new and removed volumes on the system */
+
+  /* reset the load idle ID */
+  model->load_idle_id = 0;
+
+  return FALSE;
+};
 
 
 
