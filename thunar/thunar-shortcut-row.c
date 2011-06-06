@@ -45,21 +45,29 @@ enum
 
 
 
-static void thunar_shortcut_row_constructed    (GObject           *object);
-static void thunar_shortcut_row_dispose        (GObject           *object);
-static void thunar_shortcut_row_finalize       (GObject           *object);
-static void thunar_shortcut_row_get_property   (GObject           *object,
-                                                guint              prop_id,
-                                                GValue            *value,
-                                                GParamSpec        *pspec);
-static void thunar_shortcut_row_set_property   (GObject           *object,
-                                                guint              prop_id,
-                                                const GValue      *value,
-                                                GParamSpec        *pspec);
-static void thunar_shortcut_row_icon_changed   (ThunarShortcutRow *row);
-static void thunar_shortcut_row_label_changed  (ThunarShortcutRow *row);
-static void thunar_shortcut_row_file_changed   (ThunarShortcutRow *row);
-static void thunar_shortcut_row_volume_changed (ThunarShortcutRow *row);
+static void     thunar_shortcut_row_constructed     (GObject           *object);
+static void     thunar_shortcut_row_dispose         (GObject           *object);
+static void     thunar_shortcut_row_finalize        (GObject           *object);
+static void     thunar_shortcut_row_get_property    (GObject           *object,
+                                                     guint              prop_id,
+                                                     GValue            *value,
+                                                     GParamSpec        *pspec);
+static void     thunar_shortcut_row_set_property    (GObject           *object,
+                                                     guint              prop_id,
+                                                     const GValue      *value,
+                                                     GParamSpec        *pspec);
+static gboolean thunar_shortcut_row_expose_event    (GtkWidget         *widget,
+                                                     GdkEventExpose    *event);
+static gboolean thunar_shortcut_row_focus           (GtkWidget         *widget,
+                                                     GtkDirectionType   direction);
+static gboolean thunar_shortcut_row_focus_in_event  (GtkWidget         *widget,
+                                                     GdkEventFocus     *event);
+static gboolean thunar_shortcut_row_focus_out_event (GtkWidget         *widget,
+                                                     GdkEventFocus     *event);
+static void     thunar_shortcut_row_icon_changed    (ThunarShortcutRow *row);
+static void     thunar_shortcut_row_label_changed   (ThunarShortcutRow *row);
+static void     thunar_shortcut_row_file_changed    (ThunarShortcutRow *row);
+static void     thunar_shortcut_row_volume_changed  (ThunarShortcutRow *row);
 
 
 
@@ -94,7 +102,8 @@ G_DEFINE_TYPE (ThunarShortcutRow, thunar_shortcut_row, GTK_TYPE_EVENT_BOX)
 static void
 thunar_shortcut_row_class_init (ThunarShortcutRowClass *klass)
 {
-  GObjectClass *gobject_class;
+  GtkWidgetClass *gtkwidget_class;
+  GObjectClass   *gobject_class;
 
   /* determine the parent type class */
   thunar_shortcut_row_parent_class = g_type_class_peek_parent (klass);
@@ -105,6 +114,12 @@ thunar_shortcut_row_class_init (ThunarShortcutRowClass *klass)
   gobject_class->finalize = thunar_shortcut_row_finalize; 
   gobject_class->get_property = thunar_shortcut_row_get_property;
   gobject_class->set_property = thunar_shortcut_row_set_property;
+
+  gtkwidget_class = GTK_WIDGET_CLASS (klass);
+  gtkwidget_class->expose_event = thunar_shortcut_row_expose_event;
+  gtkwidget_class->focus = thunar_shortcut_row_focus;
+  gtkwidget_class->focus_in_event = thunar_shortcut_row_focus_in_event;
+  gtkwidget_class->focus_out_event = thunar_shortcut_row_focus_out_event;
 
   g_object_class_install_property (gobject_class, PROP_ICON,
                                    g_param_spec_object ("icon",
@@ -298,6 +313,126 @@ thunar_shortcut_row_set_property (GObject      *object,
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
     }
+}
+
+
+
+static gboolean
+thunar_shortcut_row_expose_event (GtkWidget      *widget,
+                                  GdkEventExpose *event)
+{
+  GtkStateType state;
+  GList       *children;
+  GList       *lp;
+
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT_ROW (widget), FALSE);
+
+  /* determine the widget state */
+  state = gtk_widget_get_state (widget);
+
+  /* paint a flat box that gives the row the same look as a
+   * tree view row */
+  gtk_paint_flat_box (gtk_widget_get_style (widget),
+                      event->window,
+                      state,
+                      GTK_SHADOW_NONE,
+                      &event->area,
+                      widget,
+                      "cell_even_middle",
+                      event->area.x,
+                      event->area.y,
+                      event->area.width,
+                      event->area.height);
+
+  /* propagate the expose event to all children */
+  children = gtk_container_get_children (GTK_CONTAINER (widget));
+  for (lp = children; lp != NULL; lp = lp->next)
+    gtk_container_propagate_expose (GTK_CONTAINER (widget), lp->data, event);
+  g_list_free (children);
+
+  return FALSE;
+}
+
+
+
+static gboolean
+thunar_shortcut_row_focus (GtkWidget       *widget,
+                           GtkDirectionType direction)
+{
+  ThunarShortcutRow *row = THUNAR_SHORTCUT_ROW (widget);
+
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT_ROW (widget), FALSE);
+
+  switch (direction)
+    {
+    case GTK_DIR_TAB_FORWARD:
+    case GTK_DIR_TAB_BACKWARD:
+      return FALSE;
+    
+    case GTK_DIR_UP:
+      if (gtk_widget_is_focus (widget) || gtk_widget_is_focus (row->action_button))
+        {
+          return FALSE;
+        }
+      else
+        {
+          gtk_widget_grab_focus (widget);
+          return TRUE;
+        }
+
+    case GTK_DIR_DOWN:
+      if (gtk_widget_is_focus (widget) || gtk_widget_is_focus (row->action_button))
+        {
+          return FALSE;
+        }
+      else
+        {
+          gtk_widget_grab_focus (widget);
+          return TRUE;
+        }
+
+    case GTK_DIR_LEFT:
+      gtk_widget_grab_focus (widget);
+      return TRUE;
+
+    case GTK_DIR_RIGHT:
+      if (gtk_widget_get_visible (row->action_button))
+        {
+          gtk_widget_grab_focus (row->action_button);
+          return TRUE;
+        }
+      else
+        {
+          return FALSE;
+        }
+      
+    default:
+      return FALSE;
+    }
+}
+
+
+
+static gboolean
+thunar_shortcut_row_focus_in_event (GtkWidget     *widget,
+                                    GdkEventFocus *event)
+{
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT_ROW (widget), FALSE);
+
+  gtk_widget_set_state (widget, GTK_STATE_SELECTED);
+  return TRUE;
+}
+
+
+
+static gboolean
+thunar_shortcut_row_focus_out_event (GtkWidget     *widget,
+                                     GdkEventFocus *event)
+{
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT_ROW (widget), FALSE);
+
+  gtk_widget_set_state (widget, GTK_STATE_NORMAL);
+  return TRUE;
 }
 
 
