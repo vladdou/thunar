@@ -48,32 +48,40 @@ enum
 
 
 
-static void     thunar_shortcut_row_constructed        (GObject           *object);
-static void     thunar_shortcut_row_dispose            (GObject           *object);
-static void     thunar_shortcut_row_finalize           (GObject           *object);
-static void     thunar_shortcut_row_get_property       (GObject           *object,
-                                                        guint              prop_id,
-                                                        GValue            *value,
-                                                        GParamSpec        *pspec);
-static void     thunar_shortcut_row_set_property       (GObject           *object,
-                                                        guint              prop_id,
-                                                        const GValue      *value,
-                                                        GParamSpec        *pspec);
-static gboolean thunar_shortcut_row_button_press_event (GtkWidget         *widget,
-                                                        GdkEventButton    *event);
-static gboolean thunar_shortcut_row_expose_event       (GtkWidget         *widget,
-                                                        GdkEventExpose    *event);
-static gboolean thunar_shortcut_row_focus              (GtkWidget         *widget,
-                                                        GtkDirectionType   direction);
-static gboolean thunar_shortcut_row_focus_in_event     (GtkWidget         *widget,
-                                                        GdkEventFocus     *event);
-static gboolean thunar_shortcut_row_focus_out_event    (GtkWidget         *widget,
-                                                        GdkEventFocus     *event);
-static void     thunar_shortcut_row_icon_changed       (ThunarShortcutRow *row);
-static void     thunar_shortcut_row_label_changed      (ThunarShortcutRow *row);
-static void     thunar_shortcut_row_file_changed       (ThunarShortcutRow *row);
-static void     thunar_shortcut_row_volume_changed     (ThunarShortcutRow *row);
-static void     thunar_shortcut_row_icon_size_changed  (ThunarShortcutRow *row);
+static void     thunar_shortcut_row_constructed          (GObject           *object);
+static void     thunar_shortcut_row_dispose              (GObject           *object);
+static void     thunar_shortcut_row_finalize             (GObject           *object);
+static void     thunar_shortcut_row_get_property         (GObject           *object,
+                                                          guint              prop_id,
+                                                          GValue            *value,
+                                                          GParamSpec        *pspec);
+static void     thunar_shortcut_row_set_property         (GObject           *object,
+                                                          guint              prop_id,
+                                                          const GValue      *value,
+                                                          GParamSpec        *pspec);
+static gboolean thunar_shortcut_row_button_press_event   (GtkWidget         *widget,
+                                                          GdkEventButton    *event);
+static gboolean thunar_shortcut_row_enter_notify_event   (GtkWidget         *widget,
+                                                          GdkEventCrossing  *event);
+static gboolean thunar_shortcut_row_leave_notify_event   (GtkWidget         *widget,
+                                                          GdkEventCrossing  *event);
+static gboolean thunar_shortcut_row_expose_event         (GtkWidget         *widget,
+                                                          GdkEventExpose    *event);
+static gboolean thunar_shortcut_row_focus                (GtkWidget         *widget,
+                                                          GtkDirectionType   direction);
+static gboolean thunar_shortcut_row_focus_in_event       (GtkWidget         *widget,
+                                                          GdkEventFocus     *event);
+static gboolean thunar_shortcut_row_focus_out_event      (GtkWidget         *widget,
+                                                          GdkEventFocus     *event);
+static void     thunar_shortcut_row_button_state_changed (ThunarShortcutRow *row,
+                                                          GtkStateType       previous_state,
+                                                          GtkWidget         *button);
+static void     thunar_shortcut_row_icon_changed         (ThunarShortcutRow *row);
+static void     thunar_shortcut_row_label_changed        (ThunarShortcutRow *row);
+static void     thunar_shortcut_row_file_changed         (ThunarShortcutRow *row);
+static void     thunar_shortcut_row_eject_icon_changed   (ThunarShortcutRow *row);
+static void     thunar_shortcut_row_volume_changed       (ThunarShortcutRow *row);
+static void     thunar_shortcut_row_icon_size_changed    (ThunarShortcutRow *row);
 
 
 
@@ -128,6 +136,8 @@ thunar_shortcut_row_class_init (ThunarShortcutRowClass *klass)
 
   gtkwidget_class = GTK_WIDGET_CLASS (klass);
   gtkwidget_class->button_press_event = thunar_shortcut_row_button_press_event;
+  gtkwidget_class->enter_notify_event = thunar_shortcut_row_enter_notify_event;
+  gtkwidget_class->leave_notify_event = thunar_shortcut_row_leave_notify_event;
   gtkwidget_class->expose_event = thunar_shortcut_row_expose_event;
   gtkwidget_class->focus = thunar_shortcut_row_focus;
   gtkwidget_class->focus_in_event = thunar_shortcut_row_focus_in_event;
@@ -217,7 +227,11 @@ thunar_shortcut_row_init (ThunarShortcutRow *row)
   row->action_button = gtk_button_new ();
   gtk_button_set_relief (GTK_BUTTON (row->action_button), GTK_RELIEF_NONE);
   gtk_box_pack_start (GTK_BOX (box), row->action_button, FALSE, TRUE, 0);
-  gtk_widget_hide (row->action_button);
+  gtk_widget_show (row->action_button);
+
+  /* adjust the state transitions of the button */
+  g_signal_connect_swapped (row->action_button, "state-changed",
+                            G_CALLBACK (thunar_shortcut_row_button_state_changed), row);
 
   /* create the action button image */
   row->action_image = gtk_image_new ();
@@ -331,6 +345,7 @@ thunar_shortcut_row_set_property (GObject      *object,
       break;
 
     case PROP_EJECT_ICON:
+      g_debug ("set eject icon");
       thunar_shortcut_row_set_eject_icon (row, g_value_get_object (value));
       break;
 
@@ -394,6 +409,54 @@ thunar_shortcut_row_button_press_event (GtkWidget      *widget,
       /* TODO we don't handle middle-click events yet */
       g_debug ("middle click");
       return FALSE;
+    }
+
+  return TRUE;
+}
+
+
+
+static gboolean
+thunar_shortcut_row_enter_notify_event (GtkWidget        *widget,
+                                        GdkEventCrossing *event)
+{
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT_ROW (widget), FALSE);
+  
+  if (gtk_widget_get_state (widget) != GTK_STATE_SELECTED)
+    gtk_widget_set_state (widget, GTK_STATE_PRELIGHT);
+
+  return TRUE;
+}
+
+
+
+static gboolean
+thunar_shortcut_row_leave_notify_event (GtkWidget        *widget,
+                                        GdkEventCrossing *event)
+{
+  ThunarShortcutRow *row = THUNAR_SHORTCUT_ROW (widget);
+  gint               x;
+  gint               y;
+  gint               width;
+  gint               height;
+
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT_ROW (widget), FALSE);
+
+  /* check whether the row is hovered but not selected */
+  if (gtk_widget_get_state (widget) == GTK_STATE_PRELIGHT)
+    {
+      /* determine the location of the pointer relative to the action button */
+      gtk_widget_get_pointer (row->action_button, &x, &y);
+
+      /* determine the geometry of the button window */
+      gdk_window_get_geometry (gtk_widget_get_window (row->action_button),
+                               NULL, NULL, &width, &height, NULL);
+
+      /* the pointer has left the row widget itself but we only
+       * reset the prelight state if the mouse is not hovering
+       * the button either */
+      if (x < 0 || y < 0 || x >= width || y >= height)
+        gtk_widget_set_state (widget, GTK_STATE_NORMAL);
     }
 
   return TRUE;
@@ -522,12 +585,39 @@ thunar_shortcut_row_focus_out_event (GtkWidget     *widget,
 
 
 static void
+thunar_shortcut_row_button_state_changed (ThunarShortcutRow *row,
+                                          GtkStateType       previous_state,
+                                          GtkWidget         *button)
+{
+  gint x;
+  gint y;
+  gint width;
+  gint height;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
+
+  if (gtk_widget_get_state (row->action_button) == GTK_STATE_PRELIGHT
+      && gtk_widget_get_state (GTK_WIDGET (row)) == GTK_STATE_PRELIGHT)
+    {
+      gtk_widget_get_pointer (row->action_button, &x, &y);
+
+      gdk_window_get_geometry (gtk_widget_get_window (row->action_button),
+                               NULL, NULL, &width, &height, NULL);
+
+      if (x < 0 || y < 0 || x >= width || y >= height)
+        gtk_widget_set_state (row->action_button, GTK_STATE_NORMAL);
+    }
+}
+
+
+
+static void
 thunar_shortcut_row_icon_changed (ThunarShortcutRow *row)
 {
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
 
   /* update the icon image */
-  gtk_image_set_from_gicon (GTK_IMAGE (row->icon_image), row->icon, GTK_ICON_SIZE_DIALOG);
+  gtk_image_set_from_gicon (GTK_IMAGE (row->icon_image), row->icon, row->icon_size);
   gtk_widget_set_visible (row->icon_image, row->icon != NULL);
 }
 
@@ -541,6 +631,18 @@ thunar_shortcut_row_label_changed (ThunarShortcutRow *row)
   /* update the label widget */
   gtk_label_set_markup (GTK_LABEL (row->label_widget), row->label);
   gtk_widget_set_visible (row->label_widget, row->label != NULL && *row->label != '\0');
+}
+
+
+
+static void
+thunar_shortcut_row_eject_icon_changed (ThunarShortcutRow *row)
+{
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
+
+  /* update the action button image */
+  gtk_image_set_from_gicon (GTK_IMAGE (row->action_image), row->eject_icon,
+                            GTK_ICON_SIZE_MENU);
 }
 
 
@@ -591,7 +693,7 @@ thunar_shortcut_row_volume_changed (ThunarShortcutRow *row)
 
       /* update the icon image */
       icon = g_volume_get_icon (row->volume);
-      gtk_image_set_from_gicon (GTK_IMAGE (row->icon_image), icon, GTK_ICON_SIZE_DIALOG);
+      gtk_image_set_from_gicon (GTK_IMAGE (row->icon_image), icon, row->icon_size);
       gtk_widget_set_visible (row->icon_image, icon != NULL);
       g_object_unref (icon);
 
@@ -611,7 +713,6 @@ thunar_shortcut_row_icon_size_changed (ThunarShortcutRow *row)
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
 
   gtk_image_set_pixel_size (GTK_IMAGE (row->icon_image), row->icon_size);
-  gtk_image_set_pixel_size (GTK_IMAGE (row->action_image), row->icon_size);
 }
 
 
@@ -674,6 +775,8 @@ thunar_shortcut_row_set_eject_icon (ThunarShortcutRow *row,
     row->eject_icon = g_object_ref (eject_icon);
   else
     row->eject_icon = NULL;
+
+  thunar_shortcut_row_eject_icon_changed (row);
 
   g_object_notify (G_OBJECT (row), "eject-icon");
 }
