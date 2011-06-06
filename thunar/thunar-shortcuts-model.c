@@ -348,7 +348,9 @@ thunar_shortcuts_model_get_iter (GtkTreeModel *tree_model,
   if (!thunar_shortcuts_model_parse_path (model, path, &category_index, &shortcut_index))
     return FALSE;
 
+#ifndef NDEBUG
   (*iter).stamp = model->stamp;
+#endif
   (*iter).user_data = GINT_TO_POINTER (category_index);
   (*iter).user_data2 = GINT_TO_POINTER (shortcut_index);
 
@@ -1074,8 +1076,6 @@ thunar_shortcuts_model_load_volumes (gpointer user_data)
   /* create shortcuts for the volumes */
   for (lp = volumes; lp != NULL; lp = lp->next)
     {
-      g_debug ("volume: %s", g_volume_get_name (lp->data));
-
       /* create the shortcut */
       shortcut = g_slice_new0 (ThunarShortcut);
       shortcut->volume = lp->data;

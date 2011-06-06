@@ -91,6 +91,12 @@ static void     thunar_shortcut_row_button_state_changed (ThunarShortcutRow *row
                                                           GtkWidget         *button);
 static void     thunar_shortcut_row_button_clicked       (ThunarShortcutRow *row,
                                                           GtkButton         *button);
+static void     thunar_shortcut_row_mount_unmount_finish (GObject           *object,
+                                                          GAsyncResult      *result,
+                                                          gpointer           user_data);
+static void     thunar_shortcut_row_mount_eject_finish   (GObject           *object,
+                                                          GAsyncResult      *result,
+                                                          gpointer           user_data);
 static void     thunar_shortcut_row_poke_volume_finish   (ThunarBrowser     *browser,
                                                           GVolume           *volume,
                                                           ThunarFile        *file,
@@ -136,6 +142,8 @@ struct _ThunarShortcutRow
   GtkWidget         *action_image;
                     
   ThunarIconSize     icon_size;
+
+  GCancellable      *cancellable;
 };
 
 
@@ -234,6 +242,9 @@ thunar_shortcut_row_init (ThunarShortcutRow *row)
   GtkWidget *alignment;
   GtkWidget *box;
 
+  /* create a cancellable for aborting mount/unmount operations */
+  row->cancellable = g_cancellable_new ();
+
   /* configure general widget behavior */
   gtk_widget_set_can_focus (GTK_WIDGET (row), TRUE);
   gtk_widget_set_sensitive (GTK_WIDGET (row), TRUE);
@@ -322,6 +333,9 @@ thunar_shortcut_row_finalize (GObject *object)
 
   if (row->volume != NULL)
     g_object_unref (row->volume);
+
+  /* release the cancellable */
+  g_object_unref (row->cancellable);
 
   /* release the preferences */
   g_object_unref (row->preferences);
@@ -661,7 +675,123 @@ static void
 thunar_shortcut_row_button_clicked (ThunarShortcutRow *row,
                                     GtkButton         *button)
 {
-  g_debug ("left click on the action button");
+  GMountOperation *mount_operation;
+  GtkWidget       *toplevel;
+  GMount          *mount;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
+
+  if (row->volume != NULL)
+    {
+      toplevel = gtk_widget_get_toplevel (GTK_WIDGET (row));
+      mount_operation = gtk_mount_operation_new (GTK_WINDOW (toplevel));
+      gtk_mount_operation_set_screen (GTK_MOUNT_OPERATION (mount_operation),
+                                      gtk_widget_get_screen (GTK_WIDGET (row)));
+
+
+      /* check if the volume is mounted */
+      mount = g_volume_get_mount (row->volume);
+      if (mount != NULL)
+        {
+          g_debug ("have mount");
+
+          /* check if we can unmount the mount */
+          if (FALSE && g_mount_can_unmount (mount))
+            {
+              g_debug ("  trying to unmount the mount");
+
+              /* try unmounting the mount */
+              g_mount_unmount_with_operation (mount,
+                                              G_MOUNT_UNMOUNT_NONE,
+                                              mount_operation,
+                                              row->cancellable,
+                                              thunar_shortcut_row_mount_unmount_finish,
+                                              row);
+            }
+          else if (g_mount_can_eject (mount))
+            {
+              g_debug ("  trying to eject the mount");
+
+              /* try ejecting the mount */
+              g_mount_eject_with_operation (mount,
+                                            G_MOUNT_UNMOUNT_NONE,
+                                            mount_operation,
+                                            row->cancellable,
+                                            thunar_shortcut_row_mount_eject_finish,
+                                            row);
+            }
+
+          g_object_unref (mount);
+        }
+      else if (g_volume_can_eject (row->volume))
+        {
+          /* TODO try ejecting the volume */ 
+          g_debug ("trying to eject the volume");
+        }
+      else
+        {
+          /* something is out of sync... */
+          g_debug ("the volume can not be ejected but it can be clicked. what?!");
+        }
+
+      /* release the mount operation */
+      g_object_unref (mount_operation);
+    }
+  else if (row->file != NULL)
+    {
+    }
+  else
+    {
+      _thunar_assert_not_reached ();
+    }
+}
+
+
+
+static void
+thunar_shortcut_row_mount_unmount_finish (GObject      *object,
+                                          GAsyncResult *result,
+                                          gpointer      user_data)
+{
+  ThunarShortcutRow *row = THUNAR_SHORTCUT_ROW (user_data);
+  GMount            *mount = G_MOUNT (object);
+  GError            *error = NULL;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
+  _thunar_return_if_fail (G_IS_MOUNT (mount));
+  _thunar_return_if_fail (G_IS_ASYNC_RESULT (result));
+
+  if (!g_mount_unmount_with_operation_finish (mount, result, &error))
+    {
+      thunar_dialogs_show_error (GTK_WIDGET (row), error,
+                                 _("Failed to eject \"%s\""),
+                                 row->label);
+      g_error_free (error);
+    }
+}
+
+
+
+static void
+thunar_shortcut_row_mount_eject_finish (GObject      *object,
+                                        GAsyncResult *result,
+                                        gpointer      user_data)
+{
+  ThunarShortcutRow *row = THUNAR_SHORTCUT_ROW (user_data);
+  GMount            *mount = G_MOUNT (object);
+  GError            *error = NULL;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
+  _thunar_return_if_fail (G_IS_MOUNT (mount));
+  _thunar_return_if_fail (G_IS_ASYNC_RESULT (result));
+
+  if (!g_mount_eject_with_operation_finish (mount, result, &error))
+    {
+      thunar_dialogs_show_error (GTK_WIDGET (row), error,
+                                 _("Failed to eject \"%s\""),
+                                 row->label);
+      g_error_free (error);
+    }
 }
 
 
@@ -734,7 +864,7 @@ thunar_shortcut_row_resolve_and_activate (ThunarShortcutRow *row)
                                   thunar_shortcut_row_poke_volume_finish,
                                   NULL);
     }
-  else
+  else if (row->file != NULL)
     {
       file = thunar_file_get (row->file, NULL);
       if (file != NULL)
@@ -756,6 +886,10 @@ thunar_shortcut_row_resolve_and_activate (ThunarShortcutRow *row)
 
           g_error_free (error);
         }
+    }
+  else
+    {
+      _thunar_assert_not_reached ();
     }
 }
 

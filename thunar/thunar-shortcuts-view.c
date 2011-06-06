@@ -255,7 +255,7 @@ thunar_shortcuts_view_constructed (GObject *object)
           gtk_widget_show (expander);
 
           /* create a box for the shortcuts of the category */
-          box = gtk_vbox_new (FALSE, 0);
+          box = gtk_vbox_new (TRUE, 0);
           gtk_container_add (GTK_CONTAINER (expander), box);
           gtk_widget_show (box);
         }
