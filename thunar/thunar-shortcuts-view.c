@@ -105,6 +105,9 @@ static void       thunar_shortcuts_view_foreach_row              (ThunarShortcut
 static void       thunar_shortcuts_view_unselect_rows            (ThunarShortcutsView              *view,
                                                                   ThunarShortcutRow                *row,
                                                                   gpointer                          user_data);
+static void       thunar_shortcuts_view_unprelight_rows          (ThunarShortcutsView              *view,
+                                                                  ThunarShortcutRow                *row,
+                                                                  gpointer                          user_data);
 static void       thunar_shortcuts_view_update_selection_by_file (ThunarShortcutsView              *view,
                                                                   ThunarShortcutRow                *row,
                                                                   gpointer                          user_data);
@@ -482,11 +485,17 @@ thunar_shortcuts_view_row_state_changed (ThunarShortcutsView *view,
   _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
 
-  /* check if the row has been selected */
+  /* check if the row has been selected or highlighted */
   if (gtk_widget_get_state (GTK_WIDGET (row)) == GTK_STATE_SELECTED)
     {
       /* unselect all other rows */
       thunar_shortcuts_view_foreach_row (view, thunar_shortcuts_view_unselect_rows, row);
+    }
+  else if (gtk_widget_get_state (GTK_WIDGET (row)) == GTK_STATE_PRELIGHT)
+    {
+      /* unprelight all other rows */
+      thunar_shortcuts_view_foreach_row (view, thunar_shortcuts_view_unprelight_rows,
+                                         row);
     }
 }
 
@@ -549,6 +558,27 @@ thunar_shortcuts_view_unselect_rows (ThunarShortcutsView *view,
   /* reset the row state if it is not the selected row */
   if (row != selected_row && 
       gtk_widget_get_state (GTK_WIDGET (row)) == GTK_STATE_SELECTED)
+    {
+      gtk_widget_set_state (GTK_WIDGET (row), GTK_STATE_NORMAL);
+    }
+}
+
+
+
+static void
+thunar_shortcuts_view_unprelight_rows (ThunarShortcutsView *view,
+                                       ThunarShortcutRow   *row,
+                                       gpointer             user_data)
+{
+  ThunarShortcutRow *selected_row = THUNAR_SHORTCUT_ROW (user_data);
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (selected_row));
+
+  /* reset the row state if it is not the selected row */
+  if (row != selected_row && 
+      gtk_widget_get_state (GTK_WIDGET (row)) == GTK_STATE_PRELIGHT)
     {
       gtk_widget_set_state (GTK_WIDGET (row), GTK_STATE_NORMAL);
     }
