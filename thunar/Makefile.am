@@ -171,6 +171,8 @@ Thunar_SOURCES =							\
 	thunar-sendto-model.h						\
 	thunar-session-client.c						\
 	thunar-session-client.h						\
+	thunar-shortcut.c						\
+	thunar-shortcut.h						\
 	thunar-shortcut-row.c						\
 	thunar-shortcut-row.h						\
 	thunar-shortcuts-icon-renderer.c				\

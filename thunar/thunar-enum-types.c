@@ -1,21 +1,22 @@
-/* $Id$ */
+/* vi:set et ai sw=2 sts=2 ts=2: */
 /*-
  * Copyright (c) 2006-2007 Benedikt Meurer <benny@xfce.org>
- * Copyright (c) 2009 Jannis Pohlmann <jannis@xfce.org>
+ * Copyright (c) 2009-2011 Jannis Pohlmann <jannis@xfce.org>
  *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation; either version 2 of the License, or (at your option)
- * any later version.
+ * This program is free software; you can redistribute it and/or 
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of 
+ * the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the 
+ * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
- * Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU General Public 
+ * License along with this program; if not, write to the Free 
+ * Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -328,4 +329,29 @@ thunar_file_mode_get_type (void)
       type = g_flags_register_static ("ThunarFileMode", values);
     }
 	return type;
+}
+
+
+
+GType
+thunar_shortcut_type_get_type (void)
+{
+  static GType type = G_TYPE_INVALID;
+
+  if (G_UNLIKELY (type == G_TYPE_INVALID))
+    {
+      static const GEnumValue values[] =
+      {
+        { THUNAR_SHORTCUT_REGULAR_FILE,     "THUNAR_SHORTCUT_REGULAR_FILE",     "regular-file",     },
+        { THUNAR_SHORTCUT_NETWORK_FILE,     "THUNAR_SHORTCUT_NETWORK_FILE",     "network-file",     },
+        { THUNAR_SHORTCUT_STANDALONE_MOUNT, "THUNAR_SHORTCUT_STANDALONE_MOUNT", "standalone-mount", },
+        { THUNAR_SHORTCUT_EJECTABLE_VOLUME, "THUNAR_SHORTCUT_EJECTABLE_VOLUME", "ejectable-volume", },
+        { THUNAR_SHORTCUT_REGULAR_VOLUME,   "THUNAR_SHORTCUT_REGULAR_VOLUME",   "regular-volume",   },
+        { 0,                                NULL,                               NULL,               },
+      };
+
+      type = g_enum_register_static (I_("ThunarShortcutType"), values);
+    }
+
+  return type;
 }

@@ -385,6 +385,7 @@ thunar_shortcut_row_finalize (GObject *object)
     g_object_unref (row->volume);
 
   /* release the cancellable */
+  g_cancellable_cancel (row->cancellable);
   g_object_unref (row->cancellable);
 
   /* release the preferences */
