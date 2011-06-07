@@ -67,63 +67,75 @@ enum
 
 
 
-static void     thunar_shortcut_row_constructed          (GObject           *object);
-static void     thunar_shortcut_row_dispose              (GObject           *object);
-static void     thunar_shortcut_row_finalize             (GObject           *object);
-static void     thunar_shortcut_row_get_property         (GObject           *object,
-                                                          guint              prop_id,
-                                                          GValue            *value,
-                                                          GParamSpec        *pspec);
-static void     thunar_shortcut_row_set_property         (GObject           *object,
-                                                          guint              prop_id,
-                                                          const GValue      *value,
-                                                          GParamSpec        *pspec);
-static gboolean thunar_shortcut_row_button_press_event   (GtkWidget         *widget,
-                                                          GdkEventButton    *event);
-static gboolean thunar_shortcut_row_key_press_event      (GtkWidget         *widget,
-                                                          GdkEventKey       *event);
-static gboolean thunar_shortcut_row_enter_notify_event   (GtkWidget         *widget,
-                                                          GdkEventCrossing  *event);
-static gboolean thunar_shortcut_row_leave_notify_event   (GtkWidget         *widget,
-                                                          GdkEventCrossing  *event);
-static gboolean thunar_shortcut_row_expose_event         (GtkWidget         *widget,
-                                                          GdkEventExpose    *event);
-static gboolean thunar_shortcut_row_focus                (GtkWidget         *widget,
-                                                          GtkDirectionType   direction);
-static gboolean thunar_shortcut_row_focus_in_event       (GtkWidget         *widget,
-                                                          GdkEventFocus     *event);
-static void     thunar_shortcut_row_size_request         (GtkWidget         *widget,
-                                                          GtkRequisition    *requisition);
-static void     thunar_shortcut_row_button_state_changed (ThunarShortcutRow *row,
-                                                          GtkStateType       previous_state,
-                                                          GtkWidget         *button);
-static void     thunar_shortcut_row_button_clicked       (ThunarShortcutRow *row,
-                                                          GtkButton         *button);
-static void     thunar_shortcut_row_mount_unmount_finish (GObject           *object,
-                                                          GAsyncResult      *result,
-                                                          gpointer           user_data);
-static void     thunar_shortcut_row_mount_eject_finish   (GObject           *object,
-                                                          GAsyncResult      *result,
-                                                          gpointer           user_data);
-static void     thunar_shortcut_row_poke_volume_finish   (ThunarBrowser     *browser,
-                                                          GVolume           *volume,
-                                                          ThunarFile        *file,
-                                                          GError            *error,
-                                                          gpointer           unused);
-static void     thunar_shortcut_row_poke_file_finish     (ThunarBrowser     *browser,
-                                                          ThunarFile        *file,
-                                                          ThunarFile        *target_file,
-                                                          GError            *error,
-                                                          gpointer           unused);
-static void     thunar_shortcut_row_resolve_and_activate (ThunarShortcutRow *row);
-static void     thunar_shortcut_row_icon_changed         (ThunarShortcutRow *row);
-static void     thunar_shortcut_row_label_changed        (ThunarShortcutRow *row);
-static void     thunar_shortcut_row_file_changed         (ThunarShortcutRow *row);
-static void     thunar_shortcut_row_eject_icon_changed   (ThunarShortcutRow *row);
-static void     thunar_shortcut_row_volume_changed       (ThunarShortcutRow *row);
-static void     thunar_shortcut_row_icon_size_changed    (ThunarShortcutRow *row);
-static void     thunar_shortcut_row_set_spinning         (ThunarShortcutRow *row,
-                                                          gboolean           spinning);
+/* row states */
+typedef enum
+{
+  THUNAR_SHORTCUT_ROW_NORMAL,
+  THUNAR_SHORTCUT_ROW_RESOLVING,
+  THUNAR_SHORTCUT_ROW_EJECTING,
+} ThunarShortcutRowState;
+
+
+
+
+static void     thunar_shortcut_row_constructed          (GObject               *object);
+static void     thunar_shortcut_row_dispose              (GObject               *object);
+static void     thunar_shortcut_row_finalize             (GObject               *object);
+static void     thunar_shortcut_row_get_property         (GObject               *object,
+                                                          guint                  prop_id,
+                                                          GValue                *value,
+                                                          GParamSpec            *pspec);
+static void     thunar_shortcut_row_set_property         (GObject               *object,
+                                                          guint                  prop_id,
+                                                          const GValue          *value,
+                                                          GParamSpec            *pspec);
+static gboolean thunar_shortcut_row_button_press_event   (GtkWidget             *widget,
+                                                          GdkEventButton        *event);
+static gboolean thunar_shortcut_row_key_press_event      (GtkWidget             *widget,
+                                                          GdkEventKey           *event);
+static gboolean thunar_shortcut_row_enter_notify_event   (GtkWidget             *widget,
+                                                          GdkEventCrossing      *event);
+static gboolean thunar_shortcut_row_leave_notify_event   (GtkWidget             *widget,
+                                                          GdkEventCrossing      *event);
+static gboolean thunar_shortcut_row_expose_event         (GtkWidget             *widget,
+                                                          GdkEventExpose        *event);
+static gboolean thunar_shortcut_row_focus                (GtkWidget             *widget,
+                                                          GtkDirectionType       direction);
+static gboolean thunar_shortcut_row_focus_in_event       (GtkWidget             *widget,
+                                                          GdkEventFocus         *event);
+static void     thunar_shortcut_row_size_request         (GtkWidget             *widget,
+                                                          GtkRequisition        *requisition);
+static void     thunar_shortcut_row_button_state_changed (ThunarShortcutRow     *row,
+                                                          GtkStateType           previous_state,
+                                                          GtkWidget             *button);
+static void     thunar_shortcut_row_button_clicked       (ThunarShortcutRow     *row,
+                                                          GtkButton             *button);
+static void     thunar_shortcut_row_mount_unmount_finish (GObject               *object,
+                                                          GAsyncResult          *result,
+                                                          gpointer               user_data);
+static void     thunar_shortcut_row_mount_eject_finish   (GObject               *object,
+                                                          GAsyncResult          *result,
+                                                          gpointer               user_data);
+static void     thunar_shortcut_row_poke_volume_finish   (ThunarBrowser         *browser,
+                                                          GVolume               *volume,
+                                                          ThunarFile            *file,
+                                                          GError                *error,
+                                                          gpointer               unused);
+static void     thunar_shortcut_row_poke_file_finish     (ThunarBrowser         *browser,
+                                                          ThunarFile            *file,
+                                                          ThunarFile            *target_file,
+                                                          GError                *error,
+                                                          gpointer               unused);
+static void     thunar_shortcut_row_resolve_and_activate (ThunarShortcutRow     *row);
+static void     thunar_shortcut_row_icon_changed         (ThunarShortcutRow     *row);
+static void     thunar_shortcut_row_label_changed        (ThunarShortcutRow     *row);
+static void     thunar_shortcut_row_file_changed         (ThunarShortcutRow     *row);
+static void     thunar_shortcut_row_eject_icon_changed   (ThunarShortcutRow     *row);
+static void     thunar_shortcut_row_volume_changed       (ThunarShortcutRow     *row);
+static void     thunar_shortcut_row_icon_size_changed    (ThunarShortcutRow     *row);
+static void     thunar_shortcut_row_set_spinning         (ThunarShortcutRow     *row,
+                                                          gboolean               spinning,
+                                                          ThunarShortcutRowState new_state);
 
 
 
@@ -134,27 +146,29 @@ struct _ThunarShortcutRowClass
 
 struct _ThunarShortcutRow
 {
-  GtkEventBox        __parent__;
+  GtkEventBox            __parent__;
 
-  ThunarPreferences *preferences;
+  ThunarPreferences     *preferences;
 
-  gchar             *label;
-                    
-  GIcon             *icon;
-  GIcon             *eject_icon;
-                    
-  GFile             *file;
-  GVolume           *volume;
-                    
-  GtkWidget         *label_widget;
-  GtkWidget         *icon_image;
-  GtkWidget         *action_button;
-  GtkWidget         *action_image;
-  GtkWidget         *spinner;
-                    
-  ThunarIconSize     icon_size;
+  gchar                 *label;
+                        
+  GIcon                 *icon;
+  GIcon                 *eject_icon;
+                        
+  GFile                 *file;
+  GVolume               *volume;
+                        
+  GtkWidget             *label_widget;
+  GtkWidget             *icon_image;
+  GtkWidget             *action_button;
+  GtkWidget             *action_image;
+  GtkWidget             *spinner;
+                        
+  ThunarIconSize         icon_size;
 
-  GCancellable      *cancellable;
+  GCancellable          *cancellable;
+
+  ThunarShortcutRowState state;
 };
 
 
@@ -256,6 +270,9 @@ thunar_shortcut_row_init (ThunarShortcutRow *row)
 
   /* create a cancellable for aborting mount/unmount operations */
   row->cancellable = g_cancellable_new ();
+
+  /* set the row state to normal */
+  row->state = THUNAR_SHORTCUT_ROW_NORMAL;
 
   /* configure general widget behavior */
   gtk_widget_set_can_focus (GTK_WIDGET (row), TRUE);
@@ -746,6 +763,16 @@ thunar_shortcut_row_button_clicked (ThunarShortcutRow *row,
 
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
 
+  /* check if we are currently mounting/ejecting something */
+  if (row->state != THUNAR_SHORTCUT_ROW_NORMAL)
+    {
+      /* abort the mount/eject process */
+      g_cancellable_cancel (row->cancellable);
+
+      /* we're done, no further processing please */
+      return;
+    }
+
   if (row->volume != NULL)
     {
       toplevel = gtk_widget_get_toplevel (GTK_WIDGET (row));
@@ -761,12 +788,12 @@ thunar_shortcut_row_button_clicked (ThunarShortcutRow *row,
           g_debug ("have mount");
 
           /* check if we can unmount the mount */
-          if (FALSE && g_mount_can_unmount (mount))
+          if (g_mount_can_unmount (mount))
             {
               g_debug ("  trying to unmount the mount");
 
               /* start spinning */
-              thunar_shortcut_row_set_spinning (row, TRUE);
+              thunar_shortcut_row_set_spinning (row, TRUE, THUNAR_SHORTCUT_ROW_EJECTING);
 
               /* try unmounting the mount */
               g_mount_unmount_with_operation (mount,
@@ -781,7 +808,7 @@ thunar_shortcut_row_button_clicked (ThunarShortcutRow *row,
               g_debug ("  trying to eject the mount");
 
               /* start spinning */
-              thunar_shortcut_row_set_spinning (row, TRUE);
+              thunar_shortcut_row_set_spinning (row, TRUE, THUNAR_SHORTCUT_ROW_EJECTING);
 
               /* try ejecting the mount */
               g_mount_eject_with_operation (mount,
@@ -832,9 +859,6 @@ thunar_shortcut_row_mount_unmount_finish (GObject      *object,
   _thunar_return_if_fail (G_IS_MOUNT (mount));
   _thunar_return_if_fail (G_IS_ASYNC_RESULT (result));
 
-  /* stop spinning */
-  thunar_shortcut_row_set_spinning (row, FALSE);
-
   if (!g_mount_unmount_with_operation_finish (mount, result, &error))
     {
       thunar_dialogs_show_error (GTK_WIDGET (row), error,
@@ -842,6 +866,9 @@ thunar_shortcut_row_mount_unmount_finish (GObject      *object,
                                  row->label);
       g_error_free (error);
     }
+
+  /* stop spinning */
+  thunar_shortcut_row_set_spinning (row, FALSE, THUNAR_SHORTCUT_ROW_NORMAL);
 }
 
 
@@ -859,9 +886,6 @@ thunar_shortcut_row_mount_eject_finish (GObject      *object,
   _thunar_return_if_fail (G_IS_MOUNT (mount));
   _thunar_return_if_fail (G_IS_ASYNC_RESULT (result));
 
-  /* stop spinning */
-  thunar_shortcut_row_set_spinning (row, FALSE);
-
   if (!g_mount_eject_with_operation_finish (mount, result, &error))
     {
       thunar_dialogs_show_error (GTK_WIDGET (row), error,
@@ -869,6 +893,9 @@ thunar_shortcut_row_mount_eject_finish (GObject      *object,
                                  row->label);
       g_error_free (error);
     }
+
+  /* stop spinning */
+  thunar_shortcut_row_set_spinning (row, FALSE, THUNAR_SHORTCUT_ROW_NORMAL);
 }
 
 
@@ -886,9 +913,6 @@ thunar_shortcut_row_poke_volume_finish (ThunarBrowser *browser,
   _thunar_return_if_fail (G_IS_VOLUME (volume));
   _thunar_return_if_fail (file == NULL || THUNAR_IS_FILE (file));
   
-  /* deactivate the spinner */
-  thunar_shortcut_row_set_spinning (row, FALSE);
-
   if (error == NULL)
     {
       g_signal_emit (row, row_signals[SIGNAL_ACTIVATED], 0, file);
@@ -899,6 +923,9 @@ thunar_shortcut_row_poke_volume_finish (ThunarBrowser *browser,
                                  _("Failed to open \"%s\""),
                                  row->label);
     }
+
+  /* deactivate the spinner */
+  thunar_shortcut_row_set_spinning (row, FALSE, THUNAR_SHORTCUT_ROW_NORMAL);
 }
 
 
@@ -916,9 +943,6 @@ thunar_shortcut_row_poke_file_finish (ThunarBrowser *browser,
   _thunar_return_if_fail (THUNAR_IS_FILE (file));
   _thunar_return_if_fail (target_file == NULL || THUNAR_IS_FILE (target_file));
   
-  /* deactivate the spinner */
-  thunar_shortcut_row_set_spinning (row, FALSE);
-
   if (error == NULL)
     {
       g_signal_emit (row, row_signals[SIGNAL_ACTIVATED], 0, target_file);
@@ -929,6 +953,9 @@ thunar_shortcut_row_poke_file_finish (ThunarBrowser *browser,
                                  _("Failed to open \"%s\""),
                                  row->label);
     }
+
+  /* deactivate the spinner */
+  thunar_shortcut_row_set_spinning (row, FALSE, THUNAR_SHORTCUT_ROW_NORMAL);
 }
 
 
@@ -944,7 +971,7 @@ thunar_shortcut_row_resolve_and_activate (ThunarShortcutRow *row)
   if (row->volume != NULL)
     {
       /* activate the spinner */
-      thunar_shortcut_row_set_spinning (row, TRUE);
+      thunar_shortcut_row_set_spinning (row, TRUE, THUNAR_SHORTCUT_ROW_RESOLVING);
 
       thunar_browser_poke_volume (THUNAR_BROWSER (row), row->volume, row,
                                   thunar_shortcut_row_poke_volume_finish,
@@ -956,7 +983,7 @@ thunar_shortcut_row_resolve_and_activate (ThunarShortcutRow *row)
       if (file != NULL)
         {
           /* activate the spinner */
-          thunar_shortcut_row_set_spinning (row, TRUE);
+          thunar_shortcut_row_set_spinning (row, TRUE, THUNAR_SHORTCUT_ROW_RESOLVING);
 
           thunar_browser_poke_file (THUNAR_BROWSER (row), file, row,
                                     thunar_shortcut_row_poke_file_finish,
@@ -1108,10 +1135,17 @@ thunar_shortcut_row_icon_size_changed (ThunarShortcutRow *row)
 
 
 static void
-thunar_shortcut_row_set_spinning (ThunarShortcutRow *row,
-                                  gboolean           spinning)
+thunar_shortcut_row_set_spinning (ThunarShortcutRow     *row,
+                                  gboolean               spinning,
+                                  ThunarShortcutRowState new_state)
 {
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
+
+  /* apply the new state */
+  row->state = new_state;
+
+  /* reset the cancelable so that we can use it to cancel the process */
+  g_cancellable_reset (row->cancellable);
 
   if (spinning)
     {

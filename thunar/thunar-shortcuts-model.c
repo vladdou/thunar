@@ -126,12 +126,22 @@ static gboolean                thunar_shortcuts_model_find_category         (Thu
                                                                              ThunarShortcutType         type,
                                                                              ThunarShortcutCategory   **category,
                                                                              gint                      *category_index);
+static gboolean                thunar_shortcuts_model_find_volume           (ThunarShortcutsModel      *model,
+                                                                             GVolume                   *volume,
+                                                                             GtkTreeIter               *iter,
+                                                                             GtkTreePath              **path);
 static void                    thunar_shortcuts_model_add_shortcut          (ThunarShortcutsModel      *model,
                                                                              ThunarShortcut            *shortcut);
 static gboolean                thunar_shortcuts_model_load_system_shortcuts (gpointer                   user_data);
 static gboolean                thunar_shortcuts_model_load_user_dirs        (gpointer                   user_data);
 static gboolean                thunar_shortcuts_model_load_bookmarks        (gpointer                   user_data);
 static gboolean                thunar_shortcuts_model_load_volumes          (gpointer                   user_data);
+static void                    thunar_shortcuts_model_volume_added          (ThunarShortcutsModel      *model,
+                                                                             GVolume                   *volume,
+                                                                             GVolumeMonitor            *monitor);
+static void                    thunar_shortcuts_model_volume_removed        (ThunarShortcutsModel      *model,
+                                                                             GVolume                   *volume,
+                                                                             GVolumeMonitor            *monitor);
 static ThunarShortcutCategory *thunar_shortcut_category_new                 (ThunarShortcutCategoryType type);
 static void                    thunar_shortcut_category_free                (ThunarShortcutCategory    *category);
 static void                    thunar_shortcut_free                         (ThunarShortcut            *shortcut);
@@ -936,6 +946,60 @@ thunar_shortcuts_model_find_category (ThunarShortcutsModel    *model,
 
 
 
+static gboolean
+thunar_shortcuts_model_find_volume (ThunarShortcutsModel *model,
+                                    GVolume              *volume,
+                                    GtkTreeIter          *iter,
+                                    GtkTreePath         **path)
+{
+  ThunarShortcutCategory *category;
+  ThunarShortcut         *shortcut;
+  gboolean                shortcut_found = FALSE;
+  gint                    category_index;
+  gint                    shortcut_index;
+
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUTS_MODEL (model), FALSE);
+  _thunar_return_val_if_fail (G_IS_VOLUME (volume), FALSE);
+
+  for (category_index = 0; 
+       !shortcut_found && (guint) category_index < model->categories->len; 
+       ++category_index)
+    {
+      category = g_ptr_array_index (model->categories, category_index);
+
+      for (shortcut_index = 0;
+           !shortcut_found && (guint) shortcut_index < category->shortcuts->len;
+           ++shortcut_index)
+        {
+          shortcut = g_ptr_array_index (category->shortcuts, shortcut_index);
+
+          if (shortcut->volume == volume)
+            {
+              if (iter != NULL)
+                {
+#ifndef NDEBUG
+                  (*iter).stamp = model->stamp;
+#endif
+                  (*iter).user_data = GINT_TO_POINTER (category_index);
+                  (*iter).user_data2 = GINT_TO_POINTER (shortcut_index);
+                }
+
+              if (path != NULL)
+                {
+                  *path = gtk_tree_path_new_from_indices (category_index, shortcut_index,
+                                                          -1);
+                }
+
+              shortcut_found = TRUE;
+            }
+        }
+    }
+
+  return shortcut_found;
+}
+
+
+
 static void
 thunar_shortcuts_model_add_shortcut (ThunarShortcutsModel *model,
                                      ThunarShortcut       *shortcut)
@@ -1180,6 +1244,8 @@ thunar_shortcuts_model_load_volumes (gpointer user_data)
 {
   ThunarShortcutsModel *model = THUNAR_SHORTCUTS_MODEL (user_data);
   ThunarShortcut       *shortcut;
+  GVolume              *volume;
+  GList                *mounts;
   GList                *volumes;
   GList                *lp;
 
@@ -1212,13 +1278,113 @@ thunar_shortcuts_model_load_volumes (gpointer user_data)
   /* release the volume list */
   g_list_free (volumes);
 
-  /* TODO be notified of new and removed volumes on the system */
+  /* get a list of all mounts available */
+  mounts = g_volume_monitor_get_mounts (model->volume_monitor);
+
+  /* create shortcuts for the mounts */
+  for (lp = mounts; lp != NULL; lp = lp->next)
+    {
+      /* only create the shortcut if it has no volume */
+      volume = g_mount_get_volume (lp->data);
+      if (volume == NULL)
+        {
+          /* create the shortcut */
+          shortcut = g_slice_new0 (ThunarShortcut);
+          shortcut->file = g_mount_get_root (lp->data);
+          shortcut->icon = g_mount_get_icon (lp->data);
+          shortcut->eject_icon = g_themed_icon_new ("media-eject");
+          shortcut->name = g_mount_get_name (lp->data);
+          shortcut->type = THUNAR_SHORTCUT_REMOTE_FILE;
+          shortcut->visible = TRUE;
+          shortcut->mutable = TRUE;
+          shortcut->persistent = FALSE;
+
+          /* add the shortcut */
+          thunar_shortcuts_model_add_shortcut (model, shortcut);
+        }
+      else
+        {
+          /* release the volume again */
+          g_object_unref (volume);
+        }
+    }
+
+  /* release the mount list */
+  g_list_free (mounts);
+
+  /* be notified of new and removed volumes on the system */
+  g_signal_connect_swapped (model->volume_monitor, "volume-added",
+                            G_CALLBACK (thunar_shortcuts_model_volume_added), model);
+  g_signal_connect_swapped (model->volume_monitor, "volume-removed",
+                            G_CALLBACK (thunar_shortcuts_model_volume_removed), model);
 
   /* reset the load idle ID */
   model->load_idle_id = 0;
 
   return FALSE;
 };
+
+
+
+static void
+thunar_shortcuts_model_volume_added (ThunarShortcutsModel *model,
+                                     GVolume              *volume,
+                                     GVolumeMonitor       *monitor)
+{
+  ThunarShortcut *shortcut;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_MODEL (model));
+  _thunar_return_if_fail (G_IS_VOLUME (volume));
+  _thunar_return_if_fail (G_IS_VOLUME_MONITOR (monitor));
+
+  /* create a shortcut for the volume */
+  shortcut = g_slice_new0 (ThunarShortcut);
+  shortcut->volume = g_object_ref (volume);
+  shortcut->icon = g_volume_get_icon (shortcut->volume);
+  shortcut->eject_icon = g_themed_icon_new ("media-eject");
+  shortcut->name = g_volume_get_name (shortcut->volume);
+  shortcut->type = THUNAR_SHORTCUT_VOLUME;
+  shortcut->visible = TRUE;
+  shortcut->mutable = TRUE;
+  shortcut->persistent = FALSE;
+
+  /* add the shortcut to the model */
+  thunar_shortcuts_model_add_shortcut (model, shortcut);
+}
+
+
+
+static void
+thunar_shortcuts_model_volume_removed (ThunarShortcutsModel *model,
+                                       GVolume              *volume,
+                                       GVolumeMonitor       *monitor)
+{
+  ThunarShortcutCategory *category;
+  GtkTreePath            *path;
+  gint                    category_index;
+  gint                    shortcut_index;
+  
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_MODEL (model));
+  _thunar_return_if_fail (G_IS_VOLUME (volume));
+  _thunar_return_if_fail (G_IS_VOLUME_MONITOR (monitor));
+
+  /* try to find the shortcut for this volume */
+  if (thunar_shortcuts_model_find_volume (model, volume, NULL, &path))
+    {
+      /* notify others that the shortcut was removed */
+      g_signal_emit_by_name (model, "row-deleted", path, NULL);
+
+      /* get category and shortcut indices */
+      thunar_shortcuts_model_parse_path (model, path, &category_index, &shortcut_index);
+
+      /* get the category and remove the shortcut from it */
+      category = g_ptr_array_index (model->categories, category_index);
+      g_ptr_array_remove_index (category->shortcuts, shortcut_index);
+
+      /* release the tree path */
+      gtk_tree_path_free (path);
+    }
+}
 
 
 
