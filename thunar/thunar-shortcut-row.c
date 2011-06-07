@@ -38,7 +38,7 @@
 
 
 
-#define THUNAR_SHORTCUT_ROW_MIN_HEIGHT 26
+#define THUNAR_SHORTCUT_ROW_MIN_HEIGHT 20
 
 
 
@@ -298,6 +298,11 @@ thunar_shortcut_row_init (ThunarShortcutRow *row)
   row->action_image = gtk_image_new ();
   gtk_button_set_image (GTK_BUTTON (row->action_button), row->action_image);
   gtk_widget_show (row->action_image);
+
+  /* default to "media-eject", we only set this for the button size
+  * to be computed so that all rows have equal heights */
+  gtk_image_set_from_icon_name (GTK_IMAGE (row->action_image), "media-eject",
+                                GTK_ICON_SIZE_MENU);
 
   /* update the icon size whenever necessary */
   row->preferences = thunar_preferences_get ();
@@ -656,23 +661,21 @@ thunar_shortcut_row_size_request (GtkWidget      *widget,
                                   GtkRequisition *requisition)
 {
   ThunarShortcutRow *row = THUNAR_SHORTCUT_ROW (widget);
+  GtkRequisition     button_requisition;
 
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (widget));
 
   /* let the event box class compute the size we need for its children */
   (*GTK_WIDGET_CLASS (thunar_shortcut_row_parent_class)->size_request) (widget, requisition);
 
-  g_debug ("computed height: %i", requisition->height);
-
-  g_debug ("  icon size + 2: %i", row->icon_size + 2);
-  g_debug ("     min height: %i", THUNAR_SHORTCUT_ROW_MIN_HEIGHT);
+  /* compute the button size */
+  gtk_widget_size_request (row->action_button, &button_requisition);
 
   /* use the maximum of the computed requisition height, the button height,
    * the icon size + 4, and the minimum allowed height for rows */
-  requisition->height = MAX (requisition->height, (gint) row->icon_size + 2);
+  requisition->height = MAX (requisition->height, button_requisition.height);
+  requisition->height = MAX (requisition->height, (gint) row->icon_size + 4);
   requisition->height = MAX (requisition->height, THUNAR_SHORTCUT_ROW_MIN_HEIGHT);
-
-  g_debug ("  => %i", requisition->height);
 }
 
 
@@ -957,9 +960,19 @@ thunar_shortcut_row_eject_icon_changed (ThunarShortcutRow *row)
 {
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
 
-  /* update the action button image */
-  gtk_image_set_from_gicon (GTK_IMAGE (row->action_image), row->eject_icon, 
-                            GTK_ICON_SIZE_MENU);
+  if (row->eject_icon != NULL)
+    {
+      /* update the action button image */
+      gtk_image_set_from_gicon (GTK_IMAGE (row->action_image), row->eject_icon, 
+                                GTK_ICON_SIZE_MENU);
+    }
+  else
+    {
+      /* default to "media-eject", we only set this for the button size
+       * to be computed so that all rows have equal heights */
+      gtk_image_set_from_icon_name (GTK_IMAGE (row->action_image), "media-eject",
+                                    GTK_ICON_SIZE_MENU);
+    }
 }
 
 
