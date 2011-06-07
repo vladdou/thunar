@@ -25,6 +25,8 @@
 #include <glib.h>
 #include <glib-object.h>
 
+#include <gdk/gdkkeysyms.h>
+
 #include <exo/exo.h>
 
 #include <thunar/thunar-browser.h>
@@ -78,6 +80,8 @@ static void     thunar_shortcut_row_set_property         (GObject           *obj
                                                           GParamSpec        *pspec);
 static gboolean thunar_shortcut_row_button_press_event   (GtkWidget         *widget,
                                                           GdkEventButton    *event);
+static gboolean thunar_shortcut_row_key_press_event      (GtkWidget         *widget,
+                                                          GdkEventKey       *event);
 static gboolean thunar_shortcut_row_enter_notify_event   (GtkWidget         *widget,
                                                           GdkEventCrossing  *event);
 static gboolean thunar_shortcut_row_leave_notify_event   (GtkWidget         *widget,
@@ -182,6 +186,7 @@ thunar_shortcut_row_class_init (ThunarShortcutRowClass *klass)
 
   gtkwidget_class = GTK_WIDGET_CLASS (klass);
   gtkwidget_class->button_press_event = thunar_shortcut_row_button_press_event;
+  gtkwidget_class->key_press_event = thunar_shortcut_row_key_press_event;
   gtkwidget_class->enter_notify_event = thunar_shortcut_row_enter_notify_event;
   gtkwidget_class->leave_notify_event = thunar_shortcut_row_leave_notify_event;
   gtkwidget_class->expose_event = thunar_shortcut_row_expose_event;
@@ -500,6 +505,26 @@ thunar_shortcut_row_button_press_event (GtkWidget      *widget,
     }
 
   return TRUE;
+}
+
+
+
+static gboolean
+thunar_shortcut_row_key_press_event (GtkWidget   *widget,
+                                     GdkEventKey *event)
+{
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT_ROW (widget), FALSE);
+
+  if (event->keyval == GDK_KEY_Return 
+      || event->keyval == GDK_KEY_KP_Enter 
+      || event->keyval == GDK_KEY_space
+      || event->keyval== GDK_KEY_KP_Space)
+    {
+      thunar_shortcut_row_resolve_and_activate (THUNAR_SHORTCUT_ROW (widget));
+      return TRUE;
+    }
+
+  return FALSE;
 }
 
 

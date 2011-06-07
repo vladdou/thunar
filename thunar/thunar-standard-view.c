@@ -3387,10 +3387,7 @@ thunar_standard_view_request_thumbnails (ThunarStandardView *standard_view)
 
   /* reschedule the source if we're still loading the folder */
   if (thunar_view_get_loading (THUNAR_VIEW (standard_view)))
-    {
-      g_debug ("weird, this should never happen");
-      return TRUE;
-    }
+    return TRUE;
 
   /* compute visible item range */
   if ((*THUNAR_STANDARD_VIEW_GET_CLASS (standard_view)->get_visible_range) (standard_view,
