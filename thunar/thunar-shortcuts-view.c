@@ -91,6 +91,10 @@ static void       thunar_shortcuts_view_row_inserted             (ThunarShortcut
 static void       thunar_shortcuts_view_row_deleted              (ThunarShortcutsView              *view,
                                                                   GtkTreePath                      *path,
                                                                   GtkTreeModel                     *model);
+static void       thunar_shortcuts_view_row_changed              (ThunarShortcutsView              *view,
+                                                                  GtkTreePath                      *path,
+                                                                  GtkTreeIter                      *iter,
+                                                                  GtkTreeModel                     *model);
 static GtkWidget *thunar_shortcuts_view_get_expander_at          (ThunarShortcutsView              *view,
                                                                   gint                              index);
 static void       thunar_shortcuts_view_row_activated            (ThunarShortcutsView              *view,
@@ -302,6 +306,10 @@ thunar_shortcuts_view_constructed (GObject *object)
   /* be notified when a shortcut is removed from the model */
   g_signal_connect_swapped (view->model, "row-deleted",
                             G_CALLBACK (thunar_shortcuts_view_row_deleted), view);
+
+  /* be notified when a shortcut changes */
+  g_signal_connect_swapped (view->model, "row-changed",
+                            G_CALLBACK (thunar_shortcuts_view_row_changed), view);
 }
 
 
@@ -432,8 +440,7 @@ thunar_shortcuts_view_row_inserted (ThunarShortcutsView *view,
       gtk_box_reorder_child (GTK_BOX (box), shortcut_row, shortcut_index);
 
       /* show the row now (unless it was hidden by the user) */
-      if (visible)
-        gtk_widget_show (shortcut_row);
+      gtk_widget_set_visible (shortcut_row, visible);
 
       /* be notified when the user wishes to open the shortcut */
       g_signal_connect_swapped (shortcut_row, "activated",
@@ -483,6 +490,72 @@ thunar_shortcuts_view_row_deleted (ThunarShortcutsView *view,
 
   /* remove the shortcut row */
   gtk_container_remove (GTK_CONTAINER (box), row_element->data);
+
+  /* free the row list */
+  g_list_free (rows);
+}
+
+
+
+static void
+thunar_shortcuts_view_row_changed (ThunarShortcutsView *view,
+                                   GtkTreePath         *path,
+                                   GtkTreeIter         *iter,
+                                   GtkTreeModel        *model)
+{
+  ThunarShortcutRow *row;
+  GtkWidget         *expander;
+  GtkWidget         *box;
+  GIcon             *icon;
+  GList             *rows;
+  GList             *row_element;
+  gchar             *name;
+  gint               category_index;
+  gint               shortcut_index;
+
+  _thunar_return_if_fail (THUNAR_SHORTCUTS_VIEW (view));
+  _thunar_return_if_fail (GTK_IS_TREE_MODEL (model));
+
+  /* get the category and shortcut index */
+  category_index = gtk_tree_path_get_indices (path)[0];
+  shortcut_index = gtk_tree_path_get_indices (path)[1];
+
+  /* find the expander for the row widget */
+  expander = thunar_shortcuts_view_get_expander_at (view, category_index);
+
+  /* if this fails then we are out of sync with the model */
+  g_assert (expander != NULL);
+
+  /* get the box widget that holds the shortcut row */
+  box = gtk_bin_get_child (GTK_BIN (expander));
+
+  /* get a list of all shortcut rows */
+  rows = gtk_container_get_children (GTK_CONTAINER (box));
+
+  /* get the shortcut row we want to update */
+  row_element = g_list_nth (rows, shortcut_index);
+  if (row_element != NULL)
+    {
+      /* cast so that we have a proper row object to work with */
+      row = THUNAR_SHORTCUT_ROW (row_element->data);
+
+      /* read updated information from the tree row */
+      /* TODO also read the ThunarFile if we have one etc. */
+      gtk_tree_model_get (model, iter,
+                          THUNAR_SHORTCUTS_MODEL_COLUMN_NAME, &name,
+                          THUNAR_SHORTCUTS_MODEL_COLUMN_ICON, &icon,
+                          -1);
+
+      /* update the row */
+      g_object_set (row,
+                    "name", name,
+                    "icon", icon,
+                    NULL);
+
+      /* release the values */
+      g_free (name);
+      g_object_unref (icon);
+    }
 
   /* free the row list */
   g_list_free (rows);

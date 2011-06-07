@@ -54,6 +54,7 @@ enum
 /* signal identifiers */
 enum
 {
+  SIGNAL_CHANGED,
   LAST_SIGNAL,
 };
 
@@ -103,6 +104,10 @@ struct _ThunarShortcut
 
 
 G_DEFINE_TYPE (ThunarShortcut, thunar_shortcut, G_TYPE_OBJECT)
+
+
+
+static guint shortcut_signals[LAST_SIGNAL];
 
 
 
@@ -208,6 +213,12 @@ thunar_shortcut_class_init (ThunarShortcutClass *klass)
                                                          "persistent",
                                                          FALSE,
                                                          EXO_PARAM_READWRITE));
+
+  shortcut_signals[SIGNAL_CHANGED] = g_signal_new ("changed",
+                                                   G_TYPE_FROM_CLASS (klass),
+                                                   G_SIGNAL_RUN_LAST,
+                                                   0, NULL, NULL, NULL,
+                                                   G_TYPE_NONE, 0);
 }
 
 
