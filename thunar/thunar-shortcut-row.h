@@ -50,8 +50,10 @@ void       thunar_shortcut_row_set_label      (ThunarShortcutRow *row,
                                                const gchar       *label);
 void       thunar_shortcut_row_set_file       (ThunarShortcutRow *row,
                                                GFile             *file);
+GFile     *thunar_shortcut_row_get_file       (ThunarShortcutRow *row);
 void       thunar_shortcut_row_set_volume     (ThunarShortcutRow *row,
                                                GVolume           *volume);
+GVolume   *thunar_shortcut_row_get_volume     (ThunarShortcutRow *row);
 void       thunar_shortcut_row_set_icon_size  (ThunarShortcutRow *row,
                                                ThunarIconSize     icon_size);
 

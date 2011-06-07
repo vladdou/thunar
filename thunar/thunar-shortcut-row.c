@@ -1221,6 +1221,15 @@ thunar_shortcut_row_set_file (ThunarShortcutRow *row,
 
 
 
+GFile *
+thunar_shortcut_row_get_file (ThunarShortcutRow *row)
+{
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT_ROW (row), NULL);
+  return row->file;
+}
+
+
+
 void
 thunar_shortcut_row_set_volume (ThunarShortcutRow *row,
                                 GVolume           *volume)
@@ -1242,6 +1251,15 @@ thunar_shortcut_row_set_volume (ThunarShortcutRow *row,
   thunar_shortcut_row_volume_changed (row);
 
   g_object_notify (G_OBJECT (row), "volume");
+}
+
+
+
+GVolume *
+thunar_shortcut_row_get_volume (ThunarShortcutRow *row)
+{
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT_ROW (row), NULL);
+  return row->volume;
 }
 
 
