@@ -118,6 +118,8 @@ static void     thunar_shortcut_row_file_changed         (ThunarShortcutRow *row
 static void     thunar_shortcut_row_eject_icon_changed   (ThunarShortcutRow *row);
 static void     thunar_shortcut_row_volume_changed       (ThunarShortcutRow *row);
 static void     thunar_shortcut_row_icon_size_changed    (ThunarShortcutRow *row);
+static void     thunar_shortcut_row_set_spinning         (ThunarShortcutRow *row,
+                                                          gboolean           spinning);
 
 
 
@@ -144,6 +146,7 @@ struct _ThunarShortcutRow
   GtkWidget         *icon_image;
   GtkWidget         *action_button;
   GtkWidget         *action_image;
+  GtkWidget         *spinner;
                     
   ThunarIconSize     icon_size;
 
@@ -296,10 +299,22 @@ thunar_shortcut_row_init (ThunarShortcutRow *row)
   gtk_button_set_image (GTK_BUTTON (row->action_button), row->action_image);
   gtk_widget_show (row->action_image);
 
+  /* take a reference because we need to be able to remove it from the
+   * button temporarily */
+  g_object_ref (row->action_image);
+
   /* default to "media-eject", we only set this for the button size
   * to be computed so that all rows have equal heights */
   gtk_image_set_from_icon_name (GTK_IMAGE (row->action_image), "media-eject",
                                 GTK_ICON_SIZE_MENU);
+
+  /* create the spinner icon */
+  row->spinner = gtk_spinner_new ();
+  gtk_spinner_stop (GTK_SPINNER (row->spinner));
+  
+  /* take a reference because we need to be able to remove it from the
+   * button temporarily */
+  g_object_ref (row->spinner);
 
   /* update the icon size whenever necessary */
   row->preferences = thunar_preferences_get ();
@@ -330,6 +345,10 @@ thunar_shortcut_row_finalize (GObject *object)
   ThunarShortcutRow *row = THUNAR_SHORTCUT_ROW (object);
 
   g_free (row->label);
+
+  /* release the spinner and action image */
+  g_object_unref (row->spinner);
+  g_object_unref (row->action_image);
 
   if (row->icon != NULL)
     g_object_unref (row->icon);
@@ -721,6 +740,9 @@ thunar_shortcut_row_button_clicked (ThunarShortcutRow *row,
             {
               g_debug ("  trying to unmount the mount");
 
+              /* start spinning */
+              thunar_shortcut_row_set_spinning (row, TRUE);
+
               /* try unmounting the mount */
               g_mount_unmount_with_operation (mount,
                                               G_MOUNT_UNMOUNT_NONE,
@@ -732,6 +754,9 @@ thunar_shortcut_row_button_clicked (ThunarShortcutRow *row,
           else if (g_mount_can_eject (mount))
             {
               g_debug ("  trying to eject the mount");
+
+              /* start spinning */
+              thunar_shortcut_row_set_spinning (row, TRUE);
 
               /* try ejecting the mount */
               g_mount_eject_with_operation (mount,
@@ -782,6 +807,9 @@ thunar_shortcut_row_mount_unmount_finish (GObject      *object,
   _thunar_return_if_fail (G_IS_MOUNT (mount));
   _thunar_return_if_fail (G_IS_ASYNC_RESULT (result));
 
+  /* stop spinning */
+  thunar_shortcut_row_set_spinning (row, FALSE);
+
   if (!g_mount_unmount_with_operation_finish (mount, result, &error))
     {
       thunar_dialogs_show_error (GTK_WIDGET (row), error,
@@ -805,6 +833,9 @@ thunar_shortcut_row_mount_eject_finish (GObject      *object,
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
   _thunar_return_if_fail (G_IS_MOUNT (mount));
   _thunar_return_if_fail (G_IS_ASYNC_RESULT (result));
+
+  /* stop spinning */
+  thunar_shortcut_row_set_spinning (row, FALSE);
 
   if (!g_mount_eject_with_operation_finish (mount, result, &error))
     {
@@ -830,6 +861,9 @@ thunar_shortcut_row_poke_volume_finish (ThunarBrowser *browser,
   _thunar_return_if_fail (G_IS_VOLUME (volume));
   _thunar_return_if_fail (file == NULL || THUNAR_IS_FILE (file));
   
+  /* deactivate the spinner */
+  thunar_shortcut_row_set_spinning (row, FALSE);
+
   if (error == NULL)
     {
       g_signal_emit (row, row_signals[SIGNAL_ACTIVATED], 0, file);
@@ -857,6 +891,9 @@ thunar_shortcut_row_poke_file_finish (ThunarBrowser *browser,
   _thunar_return_if_fail (THUNAR_IS_FILE (file));
   _thunar_return_if_fail (target_file == NULL || THUNAR_IS_FILE (target_file));
   
+  /* deactivate the spinner */
+  thunar_shortcut_row_set_spinning (row, FALSE);
+
   if (error == NULL)
     {
       g_signal_emit (row, row_signals[SIGNAL_ACTIVATED], 0, target_file);
@@ -881,6 +918,9 @@ thunar_shortcut_row_resolve_and_activate (ThunarShortcutRow *row)
 
   if (row->volume != NULL)
     {
+      /* activate the spinner */
+      thunar_shortcut_row_set_spinning (row, TRUE);
+
       thunar_browser_poke_volume (THUNAR_BROWSER (row), row->volume, row,
                                   thunar_shortcut_row_poke_volume_finish,
                                   NULL);
@@ -890,6 +930,9 @@ thunar_shortcut_row_resolve_and_activate (ThunarShortcutRow *row)
       file = thunar_file_get (row->file, NULL);
       if (file != NULL)
         {
+          /* activate the spinner */
+          thunar_shortcut_row_set_spinning (row, TRUE);
+
           thunar_browser_poke_file (THUNAR_BROWSER (row), file, row,
                                     thunar_shortcut_row_poke_file_finish,
                                     NULL);
@@ -1033,6 +1076,36 @@ thunar_shortcut_row_icon_size_changed (ThunarShortcutRow *row)
 
   gtk_image_set_pixel_size (GTK_IMAGE (row->icon_image), row->icon_size);
   gtk_image_set_pixel_size (GTK_IMAGE (row->action_image), row->icon_size);
+
+  gtk_widget_set_size_request (row->spinner, row->icon_size, row->icon_size);
+}
+
+
+
+static void
+thunar_shortcut_row_set_spinning (ThunarShortcutRow *row,
+                                  gboolean           spinning)
+{
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
+
+  if (spinning)
+    {
+      gtk_button_set_image (GTK_BUTTON (row->action_button), row->spinner);
+      gtk_spinner_start (GTK_SPINNER (row->spinner));
+      gtk_widget_show (row->spinner);
+      gtk_widget_show (row->action_button);
+    }
+  else
+    {
+      gtk_button_set_image (GTK_BUTTON (row->action_button), row->action_image);
+      gtk_spinner_stop (GTK_SPINNER (row->spinner));
+      gtk_widget_hide (row->spinner);
+      gtk_widget_hide (row->action_button);
+
+      /* assume the volume has changed which will make the action button
+       * visible again if the volume or file is mounted and can be ejected */
+      thunar_shortcut_row_volume_changed (row);
+    }
 }
 
 
