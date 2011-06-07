@@ -129,6 +129,8 @@ static gboolean                thunar_shortcuts_model_find_category         (Thu
 static void                    thunar_shortcuts_model_add_shortcut          (ThunarShortcutsModel      *model,
                                                                              ThunarShortcut            *shortcut);
 static gboolean                thunar_shortcuts_model_load_system_shortcuts (gpointer                   user_data);
+static gboolean                thunar_shortcuts_model_load_user_dirs        (gpointer                   user_data);
+static gboolean                thunar_shortcuts_model_load_bookmarks        (gpointer                   user_data);
 static gboolean                thunar_shortcuts_model_load_volumes          (gpointer                   user_data);
 static ThunarShortcutCategory *thunar_shortcut_category_new                 (ThunarShortcutCategoryType type);
 static void                    thunar_shortcut_category_free                (ThunarShortcutCategory    *category);
@@ -1048,6 +1050,122 @@ thunar_shortcuts_model_load_system_shortcuts (gpointer user_data)
 
   /* add the shortcut */
   thunar_shortcuts_model_add_shortcut (model, shortcut);
+
+  /* load rest of the user dirs next */
+  model->load_idle_id = g_idle_add (thunar_shortcuts_model_load_user_dirs, model);
+
+  return FALSE;
+}
+
+
+
+static gboolean
+thunar_shortcuts_model_load_user_dirs (gpointer user_data)
+{
+  ThunarShortcutsModel *model = THUNAR_SHORTCUTS_MODEL (user_data);
+
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUTS_MODEL (model), FALSE);
+  
+  /* load GTK+ bookmarks next */
+  model->load_idle_id = g_idle_add (thunar_shortcuts_model_load_bookmarks, model);
+
+  return FALSE;
+}
+
+
+
+static gboolean
+thunar_shortcuts_model_load_bookmarks (gpointer user_data)
+{
+  ThunarShortcutsModel *model = THUNAR_SHORTCUTS_MODEL (user_data);
+  ThunarShortcut       *shortcut;
+  gboolean              is_local;
+  GFile                *bookmarks_file;
+  GFile                *home_file;
+  gchar                *bookmarks_path;
+  gchar                 line[2048];
+  gchar                *name;
+  gchar                *unescaped_uri;
+  FILE                 *fp;
+
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUTS_MODEL (model), FALSE);
+
+  /* resolve the bookmarks file */
+  home_file = thunar_g_file_new_for_home ();
+  bookmarks_file = g_file_resolve_relative_path (home_file, ".gtk-bookmarks");
+  bookmarks_path = g_file_get_path (bookmarks_file);
+  g_object_unref (bookmarks_file);
+  g_object_unref (home_file);
+
+  /* TODO remove all existing bookmarks */
+  
+  /* open the GTK+ bookmarks file for reading */
+  fp = fopen (bookmarks_path, "r");
+  if (fp != NULL)
+    {
+      while (fgets (line, sizeof (line), fp) != NULL)
+        {
+          /* strip leading and trailing whitespace */
+          g_strstrip (line);
+
+          /* skip over the URI */
+          for (name = line; *name != '\0' && !g_ascii_isspace (*name); ++name);
+
+          /* zero-terminate the URI */
+          *name++ = '\0';
+
+          /* check if we have a name */
+          for (; g_ascii_isspace (*name); ++name);
+
+          /* check if we have something that looks like a URI */
+          if (exo_str_looks_like_an_uri (line))
+            {
+              
+              /* create a shortcut for the desktop folder */
+              shortcut = g_slice_new0 (ThunarShortcut);
+              shortcut->file = g_file_new_for_uri (line);
+
+              if (*name != '\0')
+                {
+                  shortcut->name = g_strdup (name);
+                }
+              else
+                {
+                  unescaped_uri = g_uri_unescape_string (line, NULL);
+                  shortcut->name = g_filename_display_basename (unescaped_uri);
+                  g_free (unescaped_uri);
+                }
+
+              is_local = g_file_has_uri_scheme (shortcut->file, "file");
+
+              if (is_local)
+                {
+                  shortcut->icon = g_themed_icon_new ("folder");
+                  shortcut->type = THUNAR_SHORTCUT_LOCAL_FILE;
+                }
+              else
+                {
+                  shortcut->icon = g_themed_icon_new ("folder-remote");
+                  shortcut->type = THUNAR_SHORTCUT_REMOTE_FILE;
+                }
+
+              shortcut->visible = TRUE;
+              shortcut->mutable = FALSE;
+              shortcut->persistent = TRUE;
+
+              /* add the shortcut */
+              thunar_shortcuts_model_add_shortcut (model, shortcut);
+            }
+        }
+
+      /* close the file handle */
+      fclose (fp);
+    }
+  
+  /* free the bookmarks file path */
+  g_free (bookmarks_path);
+
+  /* TODO monitor the bookmarks file for changes */
 
   /* load volumes next */
   model->load_idle_id = g_idle_add (thunar_shortcuts_model_load_volumes, model);
