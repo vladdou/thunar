@@ -1335,6 +1335,7 @@ thunar_shortcut_row_set_spinning (ThunarShortcutRow     *row,
       gtk_button_set_image (GTK_BUTTON (row->action_button), row->action_image);
       gtk_spinner_stop (GTK_SPINNER (row->spinner));
       gtk_widget_hide (row->spinner);
+      gtk_widget_hide (row->action_button);
 
       /* assume the mount and volume have changed which will make 
        * the action button visible again if the volume or mount is 
