@@ -378,18 +378,20 @@ thunar_shortcuts_view_row_inserted (ThunarShortcutsView *view,
                                     GtkTreeIter         *iter,
                                     GtkTreeModel        *model)
 {
-  GtkWidget *box;
-  GtkWidget *expander;
-  GtkWidget *shortcut_row;
-  gboolean   category;
-  gboolean   visible;
-  GVolume   *volume;
-  GFile     *file;
-  GIcon     *eject_icon;
-  GIcon     *icon;
-  gchar     *name;
-  gint       category_index;
-  gint       shortcut_index;
+  ThunarShortcutType shortcut_type;
+  GtkWidget         *box;
+  GtkWidget         *expander;
+  GtkWidget         *shortcut_row;
+  gboolean           category;
+  gboolean           visible;
+  GVolume           *volume;
+  GMount            *mount;
+  GFile             *location;
+  GIcon             *eject_icon;
+  GIcon             *icon;
+  gchar             *name;
+  gint               category_index;
+  gint               shortcut_index;
 
   _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
   _thunar_return_if_fail (path != NULL);
@@ -401,10 +403,12 @@ thunar_shortcuts_view_row_inserted (ThunarShortcutsView *view,
                       THUNAR_SHORTCUTS_MODEL_COLUMN_CATEGORY, &category,
                       THUNAR_SHORTCUTS_MODEL_COLUMN_ICON, &icon,
                       THUNAR_SHORTCUTS_MODEL_COLUMN_NAME, &name,
-                      THUNAR_SHORTCUTS_MODEL_COLUMN_FILE, &file,
+                      THUNAR_SHORTCUTS_MODEL_COLUMN_LOCATION, &location,
                       THUNAR_SHORTCUTS_MODEL_COLUMN_VOLUME, &volume,
+                      THUNAR_SHORTCUTS_MODEL_COLUMN_MOUNT, &mount,
                       THUNAR_SHORTCUTS_MODEL_COLUMN_EJECT_ICON, &eject_icon,
                       THUNAR_SHORTCUTS_MODEL_COLUMN_VISIBLE, &visible,
+                      THUNAR_SHORTCUTS_MODEL_COLUMN_SHORTCUT_TYPE, &shortcut_type,
                       -1);
 
   if (category)
@@ -416,9 +420,15 @@ thunar_shortcuts_view_row_inserted (ThunarShortcutsView *view,
   else
     {
       /* create a row widget for the shortcut */
-      shortcut_row = thunar_shortcut_row_new (icon, name, eject_icon);
-      thunar_shortcut_row_set_file (THUNAR_SHORTCUT_ROW (shortcut_row), file);
-      thunar_shortcut_row_set_volume (THUNAR_SHORTCUT_ROW (shortcut_row), volume);
+      shortcut_row = g_object_new (THUNAR_TYPE_SHORTCUT_ROW,
+                                   "location", location,
+                                   "volume", volume,
+                                   "mount", mount,
+                                   "shortcut-type", shortcut_type,
+                                   "icon", icon,
+                                   "eject-icon", eject_icon,
+                                   "label", name,
+                                   NULL);
 
       /* get the category and shortcut index */
       category_index = gtk_tree_path_get_indices (path)[0];
@@ -727,7 +737,7 @@ thunar_shortcuts_view_update_selection_by_file (ThunarShortcutsView *view,
   _thunar_return_if_fail (THUNAR_IS_FILE (file));
 
   /* get the file and volume of the view */
-  row_file = thunar_shortcut_row_get_file (row);
+  row_file = thunar_shortcut_row_get_location (row);
   row_volume = thunar_shortcut_row_get_volume (row);
 
   /* check if we have a volume */

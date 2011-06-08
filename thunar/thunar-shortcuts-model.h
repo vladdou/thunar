@@ -38,14 +38,17 @@ typedef struct _ThunarShortcutsModel      ThunarShortcutsModel;
 
 /**
  * ThunarShortcutsModelColumn:
- * @THUNAR_SHORTCUTS_MODEL_COLUMN_ICON       : file or volume icon.
- * @THUNAR_SHORTCUTS_MODEL_COLUMN_NAME       : file or volume display name.
- * @THUNAR_SHORTCUTS_MODEL_COLUMN_FILE       : the corresponding #GFile object.
- * @THUNAR_SHORTCUTS_MODEL_COLUMN_VOLUME     : the corresponding #GVolume object.
- * @THUNAR_SHORTCUTS_MODEL_COLUMN_MUTABLE    : tells whether a row is mutable.
- * @THUNAR_SHORTCUTS_MODEL_COLUMN_EJECT_ICON : stock icon name for eject symbol.
- * @THUNAR_SHORTCUTS_MODEL_COLUMN_CATEGORY   : tells whether the row is a category.
- * @THUNAR_SHORTCUTS_MODEL_COLUMN_PERSISTENT : tells whether the row is persistent.
+ * @THUNAR_SHORTCUTS_MODEL_COLUMN_ICON          : file or volume icon.
+ * @THUNAR_SHORTCUTS_MODEL_COLUMN_NAME          : file or volume display name.
+ * @THUNAR_SHORTCUTS_MODEL_COLUMN_LOCATION      : the corresponding #GFile object.
+ * @THUNAR_SHORTCUTS_MODEL_COLUMN_FILE          : the corresponding #ThunarFile object.
+ * @THUNAR_SHORTCUTS_MODEL_COLUMN_VOLUME        : the corresponding #GVolume object.
+ * @THUNAR_SHORTCUTS_MODEL_COLUMN_MOUNT         : the corresponding #GMount object.
+ * @THUNAR_SHORTCUTS_MODEL_COLUMN_MUTABLE       : tells whether a row is mutable.
+ * @THUNAR_SHORTCUTS_MODEL_COLUMN_EJECT_ICON    : stock icon name for eject symbol.
+ * @THUNAR_SHORTCUTS_MODEL_COLUMN_CATEGORY      : tells whether the row is a category.
+ * @THUNAR_SHORTCUTS_MODEL_COLUMN_SHORTCUT_TYPE : the #ThunarShortcutType of the row.
+ * @THUNAR_SHORTCUTS_MODEL_COLUMN_PERSISTENT    : tells whether the row is persistent.
  *
  * Columns exported by #ThunarShortcutsModel using the
  * #GtkTreeModel interface.
@@ -54,11 +57,14 @@ typedef enum
 {
   THUNAR_SHORTCUTS_MODEL_COLUMN_ICON,
   THUNAR_SHORTCUTS_MODEL_COLUMN_NAME,
+  THUNAR_SHORTCUTS_MODEL_COLUMN_LOCATION,
   THUNAR_SHORTCUTS_MODEL_COLUMN_FILE,
   THUNAR_SHORTCUTS_MODEL_COLUMN_VOLUME,
+  THUNAR_SHORTCUTS_MODEL_COLUMN_MOUNT,
   THUNAR_SHORTCUTS_MODEL_COLUMN_MUTABLE,
   THUNAR_SHORTCUTS_MODEL_COLUMN_EJECT_ICON,
   THUNAR_SHORTCUTS_MODEL_COLUMN_CATEGORY,
+  THUNAR_SHORTCUTS_MODEL_COLUMN_SHORTCUT_TYPE,
   THUNAR_SHORTCUTS_MODEL_COLUMN_PERSISTENT,
   THUNAR_SHORTCUTS_MODEL_COLUMN_VISIBLE,
   THUNAR_SHORTCUTS_MODEL_N_COLUMNS,

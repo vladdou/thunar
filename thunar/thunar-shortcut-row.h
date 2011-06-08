@@ -37,25 +37,28 @@ G_BEGIN_DECLS
 typedef struct _ThunarShortcutRowClass ThunarShortcutRowClass;
 typedef struct _ThunarShortcutRow      ThunarShortcutRow;
 
-GType      thunar_shortcut_row_get_type (void) G_GNUC_CONST;
+GType              thunar_shortcut_row_get_type          (void) G_GNUC_CONST;
 
-GtkWidget *thunar_shortcut_row_new            (GIcon             *icon,
-                                               const gchar       *name,
-                                               GIcon             *eject_icon) G_GNUC_MALLOC G_GNUC_WARN_UNUSED_RESULT;
-void       thunar_shortcut_row_set_icon       (ThunarShortcutRow *row,
-                                               GIcon             *icon);
-void       thunar_shortcut_row_set_eject_icon (ThunarShortcutRow *row,
-                                               GIcon             *eject_icon);
-void       thunar_shortcut_row_set_label      (ThunarShortcutRow *row,
-                                               const gchar       *label);
-void       thunar_shortcut_row_set_file       (ThunarShortcutRow *row,
-                                               GFile             *file);
-GFile     *thunar_shortcut_row_get_file       (ThunarShortcutRow *row);
-void       thunar_shortcut_row_set_volume     (ThunarShortcutRow *row,
-                                               GVolume           *volume);
-GVolume   *thunar_shortcut_row_get_volume     (ThunarShortcutRow *row);
-void       thunar_shortcut_row_set_icon_size  (ThunarShortcutRow *row,
-                                               ThunarIconSize     icon_size);
+void               thunar_shortcut_row_set_icon          (ThunarShortcutRow *row,
+                                                          GIcon             *icon);
+void               thunar_shortcut_row_set_eject_icon    (ThunarShortcutRow *row,
+                                                          GIcon             *eject_icon);
+void               thunar_shortcut_row_set_label         (ThunarShortcutRow *row,
+                                                          const gchar       *label);
+GFile             *thunar_shortcut_row_get_location      (ThunarShortcutRow *row);
+void               thunar_shortcut_row_set_location      (ThunarShortcutRow *row,
+                                                          GFile             *location);
+GVolume           *thunar_shortcut_row_get_volume        (ThunarShortcutRow *row);
+void               thunar_shortcut_row_set_volume        (ThunarShortcutRow *row,
+                                                          GVolume           *volume);
+GMount            *thunar_shortcut_row_get_mount         (ThunarShortcutRow *row);
+void               thunar_shortcut_row_set_mount         (ThunarShortcutRow *row,
+                                                          GMount            *mount);
+ThunarShortcutType thunar_shortcut_row_get_shortcut_type (ThunarShortcutRow *row);
+void               thunar_shortcut_row_set_shortcut_type (ThunarShortcutRow *row,
+                                                          ThunarShortcutType shortcut_type);
+void               thunar_shortcut_row_set_icon_size     (ThunarShortcutRow *row,
+                                                          ThunarIconSize     icon_size);
 
 G_END_DECLS
 

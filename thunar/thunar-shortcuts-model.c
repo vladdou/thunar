@@ -306,11 +306,17 @@ thunar_shortcuts_model_get_column_type (GtkTreeModel *tree_model,
     case THUNAR_SHORTCUTS_MODEL_COLUMN_NAME:
       return G_TYPE_STRING;
 
-    case THUNAR_SHORTCUTS_MODEL_COLUMN_FILE:
+    case THUNAR_SHORTCUTS_MODEL_COLUMN_LOCATION:
       return G_TYPE_FILE;
+
+    case THUNAR_SHORTCUTS_MODEL_COLUMN_FILE:
+      return THUNAR_TYPE_FILE;
 
     case THUNAR_SHORTCUTS_MODEL_COLUMN_VOLUME:
       return G_TYPE_VOLUME;
+
+    case THUNAR_SHORTCUTS_MODEL_COLUMN_MOUNT:
+      return G_TYPE_MOUNT;
 
     case THUNAR_SHORTCUTS_MODEL_COLUMN_MUTABLE:
       return G_TYPE_BOOLEAN;
@@ -426,10 +432,18 @@ thunar_shortcuts_model_get_value (GtkTreeModel *tree_model,
         g_value_set_static_string (value, category->name);
       break;
 
-    case THUNAR_SHORTCUTS_MODEL_COLUMN_FILE:
+    case THUNAR_SHORTCUTS_MODEL_COLUMN_LOCATION:
       g_value_init (value, G_TYPE_FILE);
       if (shortcut != NULL)
         g_value_set_object (value, thunar_shortcut_get_location (shortcut));
+      else
+        g_value_set_object (value, NULL);
+      break;
+
+    case THUNAR_SHORTCUTS_MODEL_COLUMN_FILE:
+      g_value_init (value, THUNAR_TYPE_FILE);
+      if (shortcut != NULL)
+        g_value_set_object (value, thunar_shortcut_get_file (shortcut));
       else
         g_value_set_object (value, NULL);
       break;
@@ -440,6 +454,22 @@ thunar_shortcuts_model_get_value (GtkTreeModel *tree_model,
         g_value_set_object (value, thunar_shortcut_get_volume (shortcut));
       else
         g_value_set_object (value, NULL);
+      break;
+
+    case THUNAR_SHORTCUTS_MODEL_COLUMN_MOUNT:
+      g_value_init (value, G_TYPE_MOUNT);
+      if (shortcut != NULL)
+        g_value_set_object (value, thunar_shortcut_get_mount (shortcut));
+      else
+        g_value_set_object (value, NULL);
+      break;
+
+    case THUNAR_SHORTCUTS_MODEL_COLUMN_SHORTCUT_TYPE:
+      g_value_init (value, THUNAR_TYPE_SHORTCUT_TYPE);
+      if (shortcut != NULL)
+        g_value_set_enum (value, thunar_shortcut_get_shortcut_type (shortcut));
+      else
+        g_value_set_enum (value, 0);
       break;
 
     case THUNAR_SHORTCUTS_MODEL_COLUMN_MUTABLE:
@@ -867,9 +897,6 @@ thunar_shortcuts_model_find_category (ThunarShortcutsModel    *model,
   type = thunar_shortcut_get_shortcut_type (shortcut);
   file = thunar_shortcut_get_location (shortcut);
   
-  g_debug ("%s:", thunar_shortcut_get_name (shortcut));
-  g_debug ("type = %d", type);
-
   /* iterate over all available categories */
   for (n = 0; !item_belongs_here && n < model->categories->len; ++n)
     {
