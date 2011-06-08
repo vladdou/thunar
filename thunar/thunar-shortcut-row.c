@@ -920,17 +920,10 @@ thunar_shortcut_row_button_clicked (ThunarShortcutRow *row,
         {
           /* something is out of sync... */
         }
+    }
 
-      /* release the mount operation */
-      g_object_unref (mount_operation);
-    }
-  else if (row->location != NULL)
-    {
-    }
-  else
-    {
-      _thunar_assert_not_reached ();
-    }
+  /* release the mount operation */
+  g_object_unref (mount_operation);
 }
 
 
@@ -1342,10 +1335,11 @@ thunar_shortcut_row_set_spinning (ThunarShortcutRow     *row,
       gtk_button_set_image (GTK_BUTTON (row->action_button), row->action_image);
       gtk_spinner_stop (GTK_SPINNER (row->spinner));
       gtk_widget_hide (row->spinner);
-      gtk_widget_hide (row->action_button);
 
-      /* assume the volume has changed which will make the action button
-       * visible again if the volume or file is mounted and can be ejected */
+      /* assume the mount and volume have changed which will make 
+       * the action button visible again if the volume or mount is 
+       * mounted and can be ejected */
+      thunar_shortcut_row_mount_changed (row);
       thunar_shortcut_row_volume_changed (row);
     }
 }
@@ -1463,9 +1457,6 @@ thunar_shortcut_row_set_volume (ThunarShortcutRow *row,
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
   _thunar_return_if_fail (volume == NULL || G_IS_VOLUME (volume));
 
-  if (row->volume == volume)
-    return;
-
   if (row->volume != NULL)
     g_object_unref (row->volume);
 
@@ -1496,9 +1487,6 @@ thunar_shortcut_row_set_mount (ThunarShortcutRow *row,
 {
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
   _thunar_return_if_fail (mount == NULL || G_IS_MOUNT (mount));
-
-  if (row->mount == mount)
-    return;
 
   if (row->mount != NULL)
     g_object_unref (row->mount);
