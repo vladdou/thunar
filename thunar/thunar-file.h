@@ -99,6 +99,15 @@ typedef enum /*< flags >*/
 #define THUNAR_FILE_EMBLEM_NAME_CANT_WRITE "emblem-nowrite"
 #define THUNAR_FILE_EMBLEM_NAME_DESKTOP "emblem-desktop"
 
+/**
+ * ThunarFileGetAsyncFunc:
+ *
+ * Callback type for loading #ThunarFile<!---->s asynchronously.
+ **/
+typedef void (*ThunarFileGetAsyncFunc) (GFile      *location,
+                                        ThunarFile *file,
+                                        GError     *error);
+
 struct _ThunarFileClass
 {
   GObjectClass __parent__;
@@ -130,6 +139,10 @@ ThunarFile       *thunar_file_get                  (GFile                  *file
                                                     GError                **error);
 ThunarFile       *thunar_file_get_for_uri          (const gchar            *uri,
                                                     GError                **error);
+
+void              thunar_file_get_async            (GFile                 *location,
+                                                    GCancellable          *cancellable,
+                                                    ThunarFileGetAsyncFunc func);
 
 gboolean          thunar_file_load                 (ThunarFile             *file,
                                                     GCancellable           *cancellable,

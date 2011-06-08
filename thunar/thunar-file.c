@@ -117,6 +117,13 @@ static void               thunar_file_monitor                  (GFileMonitor    
                                                                 GFile                  *other_path,
                                                                 GFileMonitorEvent       event_type,
                                                                 gpointer                user_data);
+static void               thunar_file_get_async_finish         (GObject                *object,
+                                                                GAsyncResult           *result,
+                                                                gpointer                user_data);
+static void               thunar_file_prepare_reload           (ThunarFile             *file);
+static void               thunar_file_finish_reload            (ThunarFile             *file,
+                                                                GCancellable           *cancellable,
+                                                                GError                **error);
 
 
 
@@ -683,38 +690,92 @@ thunar_file_get_for_uri (const gchar *uri,
 
 
 
-/**
- * thunar_file_load:
- * @file        : a #ThunarFile.
- * @cancellable : a #GCancellable.
- * @error       : return location for errors or %NULL.
- *
- * Loads all information about the file. As this is a possibly
- * blocking call, it can be cancelled using @cancellable. 
- *
- * If loading the file fails or the operation is cancelled,
- * @error will be set.
- *
- * Return value: %TRUE on success, %FALSE on error or interruption.
- **/
-gboolean
-thunar_file_load (ThunarFile   *file,
-                  GCancellable *cancellable,
-                  GError      **error)
+static void
+thunar_file_get_async_finish (GObject      *object,
+                              GAsyncResult *result,
+                              gpointer      user_data)
 {
-  GKeyFile *key_file;
-  GError   *err = NULL;
-  GFile    *thumbnail_dir;
-  gchar    *base_name;
-  gchar    *md5_hash;
-  gchar    *p;
-  gchar    *thumbnail_dir_path;
-  gchar    *uri = NULL;
+  ThunarFileGetAsyncFunc func = user_data;
+  ThunarFile            *file;
+  GFileInfo             *file_info;
+  GError                *error = NULL;
+  GFile                 *location = G_FILE (object);
 
-  _thunar_return_val_if_fail (THUNAR_IS_FILE (file), FALSE);
-  _thunar_return_val_if_fail (error == NULL || *error == NULL, FALSE);
-  _thunar_return_val_if_fail (cancellable == NULL || G_IS_CANCELLABLE (cancellable), FALSE);
+  _thunar_return_if_fail (G_IS_FILE (location));
+  _thunar_return_if_fail (G_IS_ASYNC_RESULT (result));
 
+  /* finish querying the file information */
+  file_info = g_file_query_info_finish (location, result, &error);
+
+  /* allocate a new file object */
+  file = g_object_new (THUNAR_TYPE_FILE, NULL);
+  file->gfile = g_object_ref (location);
+
+  /* reset the file */
+  thunar_file_prepare_reload (file);
+
+  /* set the file information */
+  file->info = file_info;
+
+  /* update the file from the information */
+  /* how can we get a cancellable from the async result here */
+  thunar_file_finish_reload (file, NULL, &error);
+
+  /* insert the file into the cache */
+  G_LOCK (file_cache_mutex);
+  g_hash_table_insert (file_cache, g_object_ref (file->gfile), file);
+  G_UNLOCK (file_cache_mutex);
+
+  /* pass the loaded file and possible errors to the return function */
+  (func) (location, file, error);
+
+  /* free the error, if there is any */
+  if (error != NULL)
+    g_error_free (error);
+
+  /* release the file */
+  g_object_unref (file);
+}
+
+
+
+/**
+ * thunar_file_get_async:
+ **/
+void
+thunar_file_get_async (GFile                 *location,
+                       GCancellable          *cancellable,
+                       ThunarFileGetAsyncFunc func)
+{
+  ThunarFile *file;
+
+  _thunar_return_if_fail (G_IS_FILE (location));
+
+  /* check if we already have a cached version of that file */
+  file = thunar_file_cache_lookup (location);
+  if (G_UNLIKELY (file != NULL))
+    {
+      /* call the return function with the file from the cache */
+      (func) (location, file, NULL);
+    }
+  else
+    {
+      /* load the file information asynchronously */
+      g_file_query_info_async (location,
+                               THUNARX_FILE_INFO_NAMESPACE,
+                               G_FILE_QUERY_INFO_NONE,
+                               0,
+                               cancellable,
+                               thunar_file_get_async_finish,
+                               func);
+    }
+}
+
+
+
+static void
+thunar_file_prepare_reload (ThunarFile *file)
+{
   /* release the current file info */
   if (file->info != NULL)
     {
@@ -739,14 +800,29 @@ thunar_file_load (ThunarFile   *file,
 
   /* assume the file is mounted by default */
   file->is_mounted = TRUE;
+}
 
-  /* query a new file info */
-  file->info = g_file_query_info (file->gfile,
-                                  THUNARX_FILE_INFO_NAMESPACE,
-                                  G_FILE_QUERY_INFO_NONE,
-                                  cancellable, &err);
 
-  if (err == NULL)
+
+static void
+thunar_file_finish_reload (ThunarFile   *file,
+                           GCancellable *cancellable,
+                           GError      **error)
+{
+  const gchar *target_uri;
+  GKeyFile    *key_file;
+  GFile       *thumbnail_dir;
+  gchar       *base_name;
+  gchar       *md5_hash;
+  gchar       *p;
+  gchar       *thumbnail_dir_path;
+  gchar       *uri = NULL;
+
+  _thunar_return_if_fail (THUNAR_IS_FILE (file));
+  _thunar_return_if_fail (error != NULL);
+
+  /* check the mounted state of the file */
+  if (*error == NULL)
     {
       if (g_file_info_get_file_type (file->info) == G_FILE_TYPE_MOUNTABLE)
         {
@@ -757,10 +833,10 @@ thunar_file_load (ThunarFile   *file,
     }
   else
     {
-      if (err->domain == G_IO_ERROR && err->code == G_IO_ERROR_NOT_MOUNTED)
+      if ((*error)->domain == G_IO_ERROR && (*error)->code == G_IO_ERROR_NOT_MOUNTED)
         {
           file->is_mounted = FALSE;
-          g_clear_error (&err);
+          g_clear_error (error);
         }
     }
 
@@ -899,7 +975,48 @@ thunar_file_load (ThunarFile   *file,
   g_free (uri);
 
   /* TODO monitor the thumbnail file for changes */
+}
 
+
+
+/**
+ * thunar_file_load:
+ * @file        : a #ThunarFile.
+ * @cancellable : a #GCancellable.
+ * @error       : return location for errors or %NULL.
+ *
+ * Loads all information about the file. As this is a possibly
+ * blocking call, it can be cancelled using @cancellable. 
+ *
+ * If loading the file fails or the operation is cancelled,
+ * @error will be set.
+ *
+ * Return value: %TRUE on success, %FALSE on error or interruption.
+ **/
+gboolean
+thunar_file_load (ThunarFile   *file,
+                  GCancellable *cancellable,
+                  GError      **error)
+{
+  GError *err = NULL;
+
+  _thunar_return_val_if_fail (THUNAR_IS_FILE (file), FALSE);
+  _thunar_return_val_if_fail (error == NULL || *error == NULL, FALSE);
+  _thunar_return_val_if_fail (cancellable == NULL || G_IS_CANCELLABLE (cancellable), FALSE);
+
+  /* reset the file */
+  thunar_file_prepare_reload (file);
+
+  /* query a new file info */
+  file->info = g_file_query_info (file->gfile,
+                                  THUNARX_FILE_INFO_NAMESPACE,
+                                  G_FILE_QUERY_INFO_NONE,
+                                  cancellable, &err);
+
+  /* update from file information */
+  thunar_file_finish_reload (file, cancellable, &err);
+
+  /* propagate the error */
   if (err != NULL)
     {
       g_propagate_error (error, err);

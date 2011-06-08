@@ -60,16 +60,17 @@ enum
 
 
 
-static void thunar_shortcut_constructed  (GObject      *object);
-static void thunar_shortcut_finalize     (GObject      *object);
-static void thunar_shortcut_get_property (GObject      *object,
-                                          guint         prop_id,
-                                          GValue       *value,
-                                          GParamSpec   *pspec);
-static void thunar_shortcut_set_property (GObject      *object,
-                                          guint         prop_id,
-                                          const GValue *value,
-                                          GParamSpec   *pspec);
+static void thunar_shortcut_constructed  (GObject        *object);
+static void thunar_shortcut_finalize     (GObject        *object);
+static void thunar_shortcut_get_property (GObject        *object,
+                                          guint           prop_id,
+                                          GValue         *value,
+                                          GParamSpec     *pspec);
+static void thunar_shortcut_set_property (GObject        *object,
+                                          guint           prop_id,
+                                          const GValue   *value,
+                                          GParamSpec     *pspec);
+static void thunar_shortcut_load_file    (ThunarShortcut *shortcut);
 
 
 
@@ -131,7 +132,8 @@ thunar_shortcut_class_init (ThunarShortcutClass *klass)
                                                         "location",
                                                         "location",
                                                         G_TYPE_FILE,
-                                                        EXO_PARAM_READWRITE));
+                                                        EXO_PARAM_READWRITE |
+                                                        G_PARAM_CONSTRUCT));
 
   g_object_class_install_property (gobject_class,
                                    PROP_FILE,
@@ -147,7 +149,8 @@ thunar_shortcut_class_init (ThunarShortcutClass *klass)
                                                         "volume",
                                                         "volume",
                                                         G_TYPE_VOLUME,
-                                                        EXO_PARAM_READWRITE));
+                                                        EXO_PARAM_READWRITE |
+                                                        G_PARAM_CONSTRUCT));
 
   g_object_class_install_property (gobject_class,
                                    PROP_MOUNT,
@@ -155,7 +158,8 @@ thunar_shortcut_class_init (ThunarShortcutClass *klass)
                                                         "mount",
                                                         "mount",
                                                         G_TYPE_MOUNT,
-                                                        EXO_PARAM_READWRITE));
+                                                        EXO_PARAM_READWRITE |
+                                                        G_PARAM_CONSTRUCT));
 
   g_object_class_install_property (gobject_class,
                                    PROP_ICON,
@@ -163,7 +167,8 @@ thunar_shortcut_class_init (ThunarShortcutClass *klass)
                                                         "icon",
                                                         "icon",
                                                         G_TYPE_ICON,
-                                                        EXO_PARAM_READWRITE));
+                                                        EXO_PARAM_READWRITE |
+                                                        G_PARAM_CONSTRUCT));
 
   g_object_class_install_property (gobject_class,
                                    PROP_EJECT_ICON,
@@ -179,7 +184,8 @@ thunar_shortcut_class_init (ThunarShortcutClass *klass)
                                                         "name",
                                                         "name",
                                                         NULL,
-                                                        EXO_PARAM_READWRITE));
+                                                        EXO_PARAM_READWRITE |
+                                                        G_PARAM_CONSTRUCT));
 
   g_object_class_install_property (gobject_class,
                                    PROP_SHORTCUT_TYPE,
@@ -188,7 +194,8 @@ thunar_shortcut_class_init (ThunarShortcutClass *klass)
                                                       "shortcut-type",
                                                       THUNAR_TYPE_SHORTCUT_TYPE,
                                                       THUNAR_SHORTCUT_REGULAR_FILE,
-                                                      EXO_PARAM_READWRITE));
+                                                      EXO_PARAM_READWRITE |
+                                                      G_PARAM_CONSTRUCT));
 
   g_object_class_install_property (gobject_class,
                                    PROP_HIDDEN,
@@ -196,7 +203,8 @@ thunar_shortcut_class_init (ThunarShortcutClass *klass)
                                                          "hidden",
                                                          "hidden",
                                                          FALSE,
-                                                         EXO_PARAM_READWRITE));
+                                                         EXO_PARAM_READWRITE |
+                                                         G_PARAM_CONSTRUCT));
 
   g_object_class_install_property (gobject_class,
                                    PROP_MUTABLE,
@@ -204,7 +212,8 @@ thunar_shortcut_class_init (ThunarShortcutClass *klass)
                                                          "mutable",
                                                          "mutable",
                                                          FALSE,
-                                                         EXO_PARAM_READWRITE));
+                                                         EXO_PARAM_READWRITE |
+                                                         G_PARAM_CONSTRUCT));
 
   g_object_class_install_property (gobject_class,
                                    PROP_PERSISTENT,
@@ -212,7 +221,8 @@ thunar_shortcut_class_init (ThunarShortcutClass *klass)
                                                          "persistent",
                                                          "persistent",
                                                          FALSE,
-                                                         EXO_PARAM_READWRITE));
+                                                         EXO_PARAM_READWRITE |
+                                                         G_PARAM_CONSTRUCT));
 
   shortcut_signals[SIGNAL_CHANGED] = g_signal_new ("changed",
                                                    G_TYPE_FROM_CLASS (klass),
@@ -233,9 +243,13 @@ thunar_shortcut_init (ThunarShortcut *shortcut)
 static void
 thunar_shortcut_constructed (GObject *object)
 {
-#if 0
   ThunarShortcut *shortcut = THUNAR_SHORTCUT (object);
-#endif
+
+  if (shortcut->type == THUNAR_SHORTCUT_REGULAR_FILE
+      || shortcut->type == THUNAR_SHORTCUT_NETWORK_FILE)
+    {
+      thunar_shortcut_load_file (shortcut);
+    }
 }
 
 
@@ -390,6 +404,43 @@ thunar_shortcut_set_property (GObject      *object,
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
     }
+}
+
+
+
+#if 0
+static void
+thunar_shortcut_load_file_finish (GFile      *location,
+                                  ThunarFile *file,
+                                  GError     *error)
+{
+  if (error != NULL)
+    {
+      g_debug ("error: %s", error->message);
+    }
+  else
+    {
+      g_debug ("file loaded: %s", thunar_file_get_display_name (file));
+    }
+}
+#endif
+
+
+
+static void
+thunar_shortcut_load_file (ThunarShortcut *shortcut)
+{
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
+  
+  if (shortcut->file != NULL)
+    return;
+
+#if 0
+  /* load the ThunarFile asynchronously */
+  /* TODO pass a cancellable here */
+  thunar_file_get_async (shortcut->location, NULL,
+                         thunar_shortcut_load_file_finish);
+#endif
 }
 
 

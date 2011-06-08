@@ -849,6 +849,8 @@ thunar_shortcut_row_button_clicked (ThunarShortcutRow *row,
         }
       else if (g_mount_can_eject (row->mount))
         {
+          g_debug ("need to eject the mount");
+
           /* start spinning */
           thunar_shortcut_row_set_spinning (row, TRUE, THUNAR_SHORTCUT_ROW_EJECTING);
 
