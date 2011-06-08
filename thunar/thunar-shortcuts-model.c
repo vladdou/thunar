@@ -1519,7 +1519,7 @@ thunar_shortcuts_model_volume_added (ThunarShortcutsModel *model,
                                      GVolumeMonitor       *monitor)
 {
   ThunarShortcut *shortcut;
-  gboolean        hidden = TRUE;
+  gboolean        hidden = FALSE;
   GIcon          *eject_icon;
   GIcon          *icon;
   gchar          *name;
