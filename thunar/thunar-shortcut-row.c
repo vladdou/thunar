@@ -65,6 +65,7 @@ enum
 enum
 {
   SIGNAL_ACTIVATED,
+  SIGNAL_CONTEXT_MENU,
   LAST_SIGNAL,
 };
 
@@ -93,6 +94,8 @@ static void     thunar_shortcut_row_set_property          (GObject              
                                                            const GValue          *value,
                                                            GParamSpec            *pspec);
 static gboolean thunar_shortcut_row_button_press_event    (GtkWidget             *widget,
+                                                           GdkEventButton        *event);
+static gboolean thunar_shortcut_row_button_release_event  (GtkWidget             *widget,
                                                            GdkEventButton        *event);
 static gboolean thunar_shortcut_row_key_press_event       (GtkWidget             *widget,
                                                            GdkEventKey           *event);
@@ -210,6 +213,7 @@ thunar_shortcut_row_class_init (ThunarShortcutRowClass *klass)
 
   gtkwidget_class = GTK_WIDGET_CLASS (klass);
   gtkwidget_class->button_press_event = thunar_shortcut_row_button_press_event;
+  gtkwidget_class->button_release_event = thunar_shortcut_row_button_release_event;
   gtkwidget_class->key_press_event = thunar_shortcut_row_key_press_event;
   gtkwidget_class->enter_notify_event = thunar_shortcut_row_enter_notify_event;
   gtkwidget_class->leave_notify_event = thunar_shortcut_row_leave_notify_event;
@@ -292,12 +296,21 @@ thunar_shortcut_row_class_init (ThunarShortcutRowClass *klass)
                                                       THUNAR_ICON_SIZE_SMALLER,
                                                       EXO_PARAM_READWRITE));
 
-  row_signals[SIGNAL_ACTIVATED] = g_signal_new (I_("activated"),
-                                                G_TYPE_FROM_CLASS (klass),
-                                                G_SIGNAL_RUN_LAST,
-                                                0, NULL, NULL,
-                                                g_cclosure_marshal_VOID__OBJECT,
-                                                G_TYPE_NONE, 1, THUNAR_TYPE_FILE);
+  row_signals[SIGNAL_ACTIVATED] = 
+    g_signal_new (I_("activated"),
+                  G_TYPE_FROM_CLASS (klass),
+                  G_SIGNAL_RUN_LAST,
+                  0, NULL, NULL,
+                  g_cclosure_marshal_VOID__OBJECT,
+                  G_TYPE_NONE, 1, THUNAR_TYPE_FILE);
+
+  row_signals[SIGNAL_CONTEXT_MENU] =
+    g_signal_new (I_("context-menu"),
+                  G_TYPE_FROM_CLASS (klass),
+                  G_SIGNAL_RUN_LAST,
+                  0, NULL, NULL,
+                  g_cclosure_marshal_VOID__VOID,
+                  G_TYPE_NONE, 0);
 
 }
 
@@ -582,18 +595,43 @@ thunar_shortcut_row_button_press_event (GtkWidget      *widget,
     }
   else if (event->button == 3)
     {
-      /* TODO emit a popup-menu signal or something similar here */
-      g_debug ("right click");
+      /* TODO emit a context-menu signal or something similar here */
+      g_debug ("right button press");
       return FALSE;
     }
   else if (event->button == 2)
     {
       /* TODO we don't handle middle-click events yet */
-      g_debug ("middle click");
+      g_debug ("middle button press");
       return FALSE;
     }
 
   return TRUE;
+}
+
+
+
+static gboolean
+thunar_shortcut_row_button_release_event (GtkWidget      *widget,
+                                          GdkEventButton *event)
+{
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT_ROW (widget), FALSE);
+
+  /* distinguish between left, right and middle-click */
+  if (event->button == 3)
+    {
+      /* TODO abort the menu popup timeout created in reaction to 
+       * the right button press event */
+
+      /* emit the popup-menu signal */
+      g_signal_emit_by_name (widget, "context-menu");
+
+      return TRUE;
+    }
+  else
+    {
+      return FALSE;
+    }
 }
 
 
