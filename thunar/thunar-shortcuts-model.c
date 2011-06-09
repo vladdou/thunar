@@ -940,6 +940,14 @@ thunar_shortcuts_model_find_category (ThunarShortcutsModel    *model,
             {
               item_belongs_here = TRUE;
             }
+
+          /* mounts with mount points that are in file:// belong here */
+          if (type == THUNAR_SHORTCUT_STANDALONE_MOUNT 
+              && file != NULL 
+              && g_file_has_uri_scheme (file, "file"))
+            {
+              item_belongs_here = TRUE;
+            }
           break;
 
         case THUNAR_SHORTCUT_CATEGORY_PLACES:
@@ -1622,6 +1630,8 @@ thunar_shortcuts_model_mount_added (ThunarShortcutsModel *model,
       /* read information from the mount */
       location = g_mount_get_root (mount);
       eject_icon = g_themed_icon_new ("media-eject");
+
+      g_debug ("mount added: %s", g_mount_get_name (mount));
 
       /* create a shortcut for the mount */
       shortcut = g_object_new (THUNAR_TYPE_SHORTCUT,
