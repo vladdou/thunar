@@ -535,10 +535,10 @@ thunar_shortcut_set_location (ThunarShortcut *shortcut,
           g_free (uri);
 
           /* use the folder icon as the default icon */
-          if (shortcut->custom_icon == NULL)
+          if (shortcut->icon == NULL)
             {
               icon = g_themed_icon_new ("folder");
-              thunar_shortcut_set_custom_icon (shortcut, icon);
+              thunar_shortcut_set_icon (shortcut, icon);
               g_object_unref (icon);
             }
 
@@ -565,6 +565,8 @@ void
 thunar_shortcut_set_file (ThunarShortcut *shortcut,
                           ThunarFile     *file)
 {
+  GIcon *icon;
+
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
   _thunar_return_if_fail (file == NULL || THUNAR_IS_FILE (file));
 
@@ -592,7 +594,10 @@ thunar_shortcut_set_file (ThunarShortcut *shortcut,
           /* update the name and icon of the shortcut */
           thunar_shortcut_set_name (shortcut, 
                                     thunar_file_get_display_name (shortcut->file));
-          thunar_shortcut_set_custom_icon (shortcut, thunar_file_get_icon (shortcut->file));
+
+          icon = thunar_file_get_icon (shortcut->file);
+          if (icon != NULL)
+            thunar_shortcut_set_icon (shortcut, icon);
         }
     }
 
@@ -645,7 +650,7 @@ thunar_shortcut_set_volume (ThunarShortcut *shortcut,
           name = g_volume_get_name (shortcut->volume);
           icon = g_volume_get_icon (shortcut->volume);
           thunar_shortcut_set_name (shortcut, name);
-          thunar_shortcut_set_custom_icon (shortcut, icon);
+          thunar_shortcut_set_icon (shortcut, icon);
           g_object_unref (icon);
           g_free (name);
         }
@@ -699,7 +704,7 @@ thunar_shortcut_set_mount (ThunarShortcut *shortcut,
           name = g_mount_get_name (shortcut->mount);
           icon = g_mount_get_icon (shortcut->mount);
           thunar_shortcut_set_name (shortcut, name);
-          thunar_shortcut_set_custom_icon (shortcut, icon);
+          thunar_shortcut_set_icon (shortcut, icon);
           g_object_unref (icon);
           g_free (name);
         }
