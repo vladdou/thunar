@@ -1182,8 +1182,6 @@ thunar_shortcut_row_label_changed (ThunarShortcutRow *row)
 {
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
 
-  g_debug ("label changed: %s", row->label);
-
   /* update the label widget */
   gtk_label_set_markup (GTK_LABEL (row->label_widget), row->label);
   gtk_widget_set_visible (row->label_widget, row->label != NULL && *row->label != '\0');

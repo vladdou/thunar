@@ -253,11 +253,14 @@ thunar_shortcuts_view_constructed (GObject *object)
 {
   ThunarShortcutsView *view = THUNAR_SHORTCUTS_VIEW (object);
   GtkTreeIter          iter;
+  GtkTreeIter          child_iter;
+  GtkTreePath         *path;
   const gchar         *markup_format = "<span size='medium' weight='bold' color='#353535'>%s</span>";
   GtkWidget           *box;
   GtkWidget           *expander;
   gboolean             category;
   gboolean             valid_iter = FALSE;
+  gboolean             valid_child = FALSE;
   gchar               *markup;
   gchar               *name;
 
@@ -272,9 +275,7 @@ thunar_shortcuts_view_constructed (GObject *object)
   valid_iter = gtk_tree_model_get_iter_first (view->model, &iter);
   while (valid_iter)
     {
-      /* TODO read values from the row and create an expander,
-       * shortcut row or drop placeholder, depending on the
-       * row values */
+      /* read category information from the model */
       gtk_tree_model_get (view->model, &iter,
                           THUNAR_SHORTCUTS_MODEL_COLUMN_CATEGORY, &category,
                           THUNAR_SHORTCUTS_MODEL_COLUMN_NAME, &name,
@@ -300,13 +301,23 @@ thunar_shortcuts_view_constructed (GObject *object)
           box = gtk_vbox_new (TRUE, 0);
           gtk_container_add (GTK_CONTAINER (expander), box);
           gtk_widget_show (box);
-        }
-      else
-        {
-          /* we will have to implement this at some point but right now, the
-           * model data is loaded in an idle handler, so there is no data other
-           * than categories during construction */
-          _thunar_assert_not_reached ();
+
+          /* check if the categories has any entries */
+          valid_child = gtk_tree_model_iter_children (view->model, &child_iter, &iter);
+          while (valid_child)
+            {
+              /* create a tree path for the shortcut */
+              path = gtk_tree_model_get_path (view->model, &child_iter);
+
+              /* add the shortcut */
+              thunar_shortcuts_view_row_inserted (view, path, &child_iter, view->model);
+
+              /* release the path */
+              gtk_tree_path_free (path);
+
+              /* advance to the next child row */
+              valid_child = gtk_tree_model_iter_next (view->model, &child_iter);
+            }
         }
 
       /* advance to the next row */

@@ -634,7 +634,7 @@ thunar_shortcuts_model_iter_children (GtkTreeModel *tree_model,
           (*iter).stamp = model->stamp;
 #endif
           (*iter).user_data = GINT_TO_POINTER (category_index);
-          (*iter).user_data = GINT_TO_POINTER (0);
+          (*iter).user_data2 = GINT_TO_POINTER (0);
           return TRUE;
         }
     }
@@ -1630,8 +1630,6 @@ thunar_shortcuts_model_mount_added (ThunarShortcutsModel *model,
       /* read information from the mount */
       location = g_mount_get_root (mount);
       eject_icon = g_themed_icon_new ("media-eject");
-
-      g_debug ("mount added: %s", g_mount_get_name (mount));
 
       /* create a shortcut for the mount */
       shortcut = g_object_new (THUNAR_TYPE_SHORTCUT,
