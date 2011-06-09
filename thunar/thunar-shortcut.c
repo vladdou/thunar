@@ -43,8 +43,10 @@ enum
   PROP_VOLUME,
   PROP_MOUNT,
   PROP_ICON,
+  PROP_CUSTOM_ICON,
   PROP_EJECT_ICON,
   PROP_NAME,
+  PROP_CUSTOM_NAME,
   PROP_SHORTCUT_TYPE,
   PROP_HIDDEN,
   PROP_MUTABLE,
@@ -54,23 +56,26 @@ enum
 /* signal identifiers */
 enum
 {
-  SIGNAL_CHANGED,
   LAST_SIGNAL,
 };
 
 
 
-static void thunar_shortcut_constructed  (GObject        *object);
-static void thunar_shortcut_finalize     (GObject        *object);
-static void thunar_shortcut_get_property (GObject        *object,
-                                          guint           prop_id,
-                                          GValue         *value,
-                                          GParamSpec     *pspec);
-static void thunar_shortcut_set_property (GObject        *object,
-                                          guint           prop_id,
-                                          const GValue   *value,
-                                          GParamSpec     *pspec);
-static void thunar_shortcut_load_file    (ThunarShortcut *shortcut);
+static void thunar_shortcut_constructed      (GObject        *object);
+static void thunar_shortcut_finalize         (GObject        *object);
+static void thunar_shortcut_get_property     (GObject        *object,
+                                              guint           prop_id,
+                                              GValue         *value,
+                                              GParamSpec     *pspec);
+static void thunar_shortcut_set_property     (GObject        *object,
+                                              guint           prop_id,
+                                              const GValue   *value,
+                                              GParamSpec     *pspec);
+static void thunar_shortcut_load_file_finish (GFile          *location,
+                                              ThunarFile     *file,
+                                              GError         *error,
+                                              gpointer        user_data);
+static void thunar_shortcut_load_file        (ThunarShortcut *shortcut);
 
 
 
@@ -90,9 +95,11 @@ struct _ThunarShortcut
   GMount            *mount;
   
   GIcon             *icon;
+  GIcon             *custom_icon;
   GIcon             *eject_icon;
   
   gchar             *name;
+  gchar             *custom_name;
   
   ThunarShortcutType type;
 
@@ -100,15 +107,12 @@ struct _ThunarShortcut
   guint              mutable : 1;
   guint              persistent : 1;
 
+  guint              constructed : 1;
 };
 
 
 
 G_DEFINE_TYPE (ThunarShortcut, thunar_shortcut, G_TYPE_OBJECT)
-
-
-
-static guint shortcut_signals[LAST_SIGNAL];
 
 
 
@@ -171,6 +175,15 @@ thunar_shortcut_class_init (ThunarShortcutClass *klass)
                                                         G_PARAM_CONSTRUCT));
 
   g_object_class_install_property (gobject_class,
+                                   PROP_CUSTOM_ICON,
+                                   g_param_spec_object ("custom-icon",
+                                                        "custom-icon",
+                                                        "custom-icon",
+                                                        G_TYPE_ICON,
+                                                        EXO_PARAM_READWRITE |
+                                                        G_PARAM_CONSTRUCT));
+
+  g_object_class_install_property (gobject_class,
                                    PROP_EJECT_ICON,
                                    g_param_spec_object ("eject-icon",
                                                         "eject-icon",
@@ -183,6 +196,15 @@ thunar_shortcut_class_init (ThunarShortcutClass *klass)
                                    g_param_spec_string ("name",
                                                         "name",
                                                         "name",
+                                                        NULL,
+                                                        EXO_PARAM_READWRITE |
+                                                        G_PARAM_CONSTRUCT));
+
+  g_object_class_install_property (gobject_class,
+                                   PROP_CUSTOM_NAME,
+                                   g_param_spec_string ("custom-name",
+                                                        "custom-name",
+                                                        "custom-name",
                                                         NULL,
                                                         EXO_PARAM_READWRITE |
                                                         G_PARAM_CONSTRUCT));
@@ -223,12 +245,6 @@ thunar_shortcut_class_init (ThunarShortcutClass *klass)
                                                          FALSE,
                                                          EXO_PARAM_READWRITE |
                                                          G_PARAM_CONSTRUCT));
-
-  shortcut_signals[SIGNAL_CHANGED] = g_signal_new ("changed",
-                                                   G_TYPE_FROM_CLASS (klass),
-                                                   G_SIGNAL_RUN_LAST,
-                                                   0, NULL, NULL, NULL,
-                                                   G_TYPE_NONE, 0);
 }
 
 
@@ -245,11 +261,8 @@ thunar_shortcut_constructed (GObject *object)
 {
   ThunarShortcut *shortcut = THUNAR_SHORTCUT (object);
 
-  if (shortcut->type == THUNAR_SHORTCUT_REGULAR_FILE
-      || shortcut->type == THUNAR_SHORTCUT_NETWORK_FILE)
-    {
-      thunar_shortcut_load_file (shortcut);
-    }
+  /* mark as constructed so now all properties can be changed as usual */
+  shortcut->constructed = TRUE;
 }
 
 
@@ -274,10 +287,14 @@ thunar_shortcut_finalize (GObject *object)
   if (shortcut->icon != NULL)
     g_object_unref (shortcut->icon);
 
+  if (shortcut->custom_icon != NULL)
+    g_object_unref (shortcut->custom_icon);
+
   if (shortcut->eject_icon != NULL)
     g_object_unref (shortcut->eject_icon);
 
   g_free (shortcut->name);
+  g_free (shortcut->custom_name);
 
   (*G_OBJECT_CLASS (thunar_shortcut_parent_class)->finalize) (object);
 }
@@ -314,12 +331,20 @@ thunar_shortcut_get_property (GObject    *object,
       g_value_set_object (value, thunar_shortcut_get_icon (shortcut));
       break;
 
+    case PROP_CUSTOM_ICON:
+      g_value_set_object (value, thunar_shortcut_get_custom_icon (shortcut));
+      break;
+
     case PROP_EJECT_ICON:
       g_value_set_object (value, thunar_shortcut_get_eject_icon (shortcut));
       break;
 
     case PROP_NAME:
       g_value_set_string (value, thunar_shortcut_get_name (shortcut));
+      break;
+
+    case PROP_CUSTOM_NAME:
+      g_value_set_string (value, thunar_shortcut_get_custom_name (shortcut));
       break;
 
     case PROP_SHORTCUT_TYPE:
@@ -376,12 +401,20 @@ thunar_shortcut_set_property (GObject      *object,
       thunar_shortcut_set_icon (shortcut, g_value_get_object (value));
       break;
 
+    case PROP_CUSTOM_ICON:
+      thunar_shortcut_set_custom_icon (shortcut, g_value_get_object (value));
+      break;
+
     case PROP_EJECT_ICON:
       thunar_shortcut_set_eject_icon (shortcut, g_value_get_object (value));
       break;
 
     case PROP_NAME:
       thunar_shortcut_set_name (shortcut, g_value_get_string (value));
+      break;
+
+    case PROP_CUSTOM_NAME:
+      thunar_shortcut_set_custom_name (shortcut, g_value_get_string (value));
       break;
 
     case PROP_SHORTCUT_TYPE:
@@ -408,22 +441,31 @@ thunar_shortcut_set_property (GObject      *object,
 
 
 
-#if 0
 static void
 thunar_shortcut_load_file_finish (GFile      *location,
                                   ThunarFile *file,
-                                  GError     *error)
+                                  GError     *error,
+                                  gpointer    user_data)
 {
+  ThunarShortcut *shortcut = THUNAR_SHORTCUT (user_data);
+
+  _thunar_return_if_fail (G_IS_FILE (location));
+  _thunar_return_if_fail (file == NULL || THUNAR_IS_FILE (file));
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
+  
   if (error != NULL)
     {
-      g_debug ("error: %s", error->message);
+      g_debug ("file load error: %s", error->message);
     }
   else
     {
-      g_debug ("file loaded: %s", thunar_file_get_display_name (file));
+      /* set the file and update the shortcut */
+      thunar_shortcut_set_file (shortcut, file);
     }
+
+  /* release the shortcut */
+  g_object_unref (shortcut);
 }
-#endif
 
 
 
@@ -435,12 +477,11 @@ thunar_shortcut_load_file (ThunarShortcut *shortcut)
   if (shortcut->file != NULL)
     return;
 
-#if 0
   /* load the ThunarFile asynchronously */
   /* TODO pass a cancellable here */
   thunar_file_get_async (shortcut->location, NULL,
-                         thunar_shortcut_load_file_finish);
-#endif
+                         thunar_shortcut_load_file_finish,
+                         g_object_ref (shortcut));
 }
 
 
@@ -458,8 +499,15 @@ void
 thunar_shortcut_set_location (ThunarShortcut *shortcut,
                               GFile          *location)
 {
+  GIcon *icon;
+  gchar *base_name;
+  gchar *uri;
+
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
   _thunar_return_if_fail (location == NULL || G_IS_FILE (location));
+
+  if (location == NULL && !shortcut->constructed)
+    return;
 
   if (shortcut->location == location)
     return;
@@ -471,6 +519,33 @@ thunar_shortcut_set_location (ThunarShortcut *shortcut,
     shortcut->location = g_object_ref (location);
   else
     shortcut->location = NULL;
+
+  /* check if we have a file shortcut */
+  if (shortcut->type == THUNAR_SHORTCUT_REGULAR_FILE
+      || shortcut->type == THUNAR_SHORTCUT_NETWORK_FILE)
+    {
+      /* check whether we have a location */
+      if (shortcut->location != NULL)
+        {
+          /* use the location base name as the default name */
+          uri = g_file_get_uri (shortcut->location);
+          base_name = g_filename_display_basename (uri);
+          thunar_shortcut_set_name (shortcut, base_name);
+          g_free (base_name);
+          g_free (uri);
+
+          /* use the folder icon as the default icon */
+          if (shortcut->custom_icon == NULL)
+            {
+              icon = g_themed_icon_new ("folder");
+              thunar_shortcut_set_custom_icon (shortcut, icon);
+              g_object_unref (icon);
+            }
+
+          /* load file asynchronously */
+          thunar_shortcut_load_file (shortcut);
+        }
+    }
 
   g_object_notify (G_OBJECT (shortcut), "location");
 }
@@ -493,6 +568,9 @@ thunar_shortcut_set_file (ThunarShortcut *shortcut,
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
   _thunar_return_if_fail (file == NULL || THUNAR_IS_FILE (file));
 
+  if (file == NULL && !shortcut->constructed)
+    return;
+
   if (shortcut->file == file)
     return;
 
@@ -503,6 +581,20 @@ thunar_shortcut_set_file (ThunarShortcut *shortcut,
     shortcut->file = g_object_ref (file);
   else
     shortcut->file = NULL;
+
+  /* check whether we have a file shortcut */
+  if (shortcut->type == THUNAR_SHORTCUT_REGULAR_FILE
+      || shortcut->type == THUNAR_SHORTCUT_NETWORK_FILE)
+    {
+      /* update only if we have a file */
+      if (shortcut->file != NULL)
+        {
+          /* update the name and icon of the shortcut */
+          thunar_shortcut_set_name (shortcut, 
+                                    thunar_file_get_display_name (shortcut->file));
+          thunar_shortcut_set_custom_icon (shortcut, thunar_file_get_icon (shortcut->file));
+        }
+    }
 
   g_object_notify (G_OBJECT (shortcut), "file");
 }
@@ -522,8 +614,14 @@ void
 thunar_shortcut_set_volume (ThunarShortcut *shortcut,
                             GVolume        *volume)
 {
+  GIcon *icon;
+  gchar *name;
+
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
   _thunar_return_if_fail (volume == NULL || G_IS_VOLUME (volume));
+
+  if (volume == NULL && !shortcut->constructed)
+    return;
 
   if (shortcut->volume == volume)
     return;
@@ -535,6 +633,23 @@ thunar_shortcut_set_volume (ThunarShortcut *shortcut,
     shortcut->volume = g_object_ref (volume);
   else
     shortcut->volume = NULL;
+
+  /* check if we have a regular or ejectable volume */
+  if (shortcut->type == THUNAR_SHORTCUT_REGULAR_VOLUME
+      || shortcut->type == THUNAR_SHORTCUT_EJECTABLE_VOLUME)
+    {
+      /* only update if we have a volume */
+      if (shortcut->volume != NULL)
+        {
+          /* update the name and icon of the shortcut */
+          name = g_volume_get_name (shortcut->volume);
+          icon = g_volume_get_icon (shortcut->volume);
+          thunar_shortcut_set_name (shortcut, name);
+          thunar_shortcut_set_custom_icon (shortcut, icon);
+          g_object_unref (icon);
+          g_free (name);
+        }
+    }
 
   g_object_notify (G_OBJECT (shortcut), "volume");
 }
@@ -554,8 +669,14 @@ void
 thunar_shortcut_set_mount (ThunarShortcut *shortcut,
                            GMount         *mount)
 {
+  GIcon *icon;
+  gchar *name;
+
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
   _thunar_return_if_fail (mount == NULL || G_IS_MOUNT (mount));
+
+  if (mount == NULL && !shortcut->constructed)
+    return;
 
   if (shortcut->mount == mount)
     return;
@@ -568,6 +689,21 @@ thunar_shortcut_set_mount (ThunarShortcut *shortcut,
   else
     shortcut->mount = NULL;
 
+  /* check if we have a standalone mount */
+  if (shortcut->type == THUNAR_SHORTCUT_STANDALONE_MOUNT)
+    {
+      /* only update if we have a mount */
+      if (shortcut->mount != NULL)
+        {
+          /* update the name and icon of the shortcut  */
+          name = g_mount_get_name (shortcut->mount);
+          icon = g_mount_get_icon (shortcut->mount);
+          thunar_shortcut_set_name (shortcut, name);
+          thunar_shortcut_set_custom_icon (shortcut, icon);
+          g_object_unref (icon);
+          g_free (name);
+        }
+    }
   g_object_notify (G_OBJECT (shortcut), "mount");
 }
 
@@ -589,6 +725,9 @@ thunar_shortcut_set_icon (ThunarShortcut *shortcut,
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
   _thunar_return_if_fail (icon == NULL || G_IS_ICON (icon));
 
+  if (icon == NULL && !shortcut->constructed)
+    return;
+
   if (shortcut->icon == icon)
     return;
 
@@ -601,6 +740,41 @@ thunar_shortcut_set_icon (ThunarShortcut *shortcut,
     shortcut->icon = NULL;
 
   g_object_notify (G_OBJECT (shortcut), "icon");
+}
+
+
+
+GIcon *
+thunar_shortcut_get_custom_icon (ThunarShortcut *shortcut)
+{
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT (shortcut), NULL);
+  return shortcut->custom_icon;
+}
+
+
+
+void
+thunar_shortcut_set_custom_icon (ThunarShortcut *shortcut,
+                                 GIcon          *custom_icon)
+{
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
+  _thunar_return_if_fail (custom_icon == NULL || G_IS_ICON (custom_icon));
+
+  if (custom_icon == NULL && !shortcut->constructed)
+    return;
+
+  if (shortcut->custom_icon == custom_icon)
+    return;
+
+  if (shortcut->custom_icon != NULL)
+    g_object_unref (shortcut->custom_icon);
+
+  if (custom_icon != NULL)
+    shortcut->custom_icon = g_object_ref (custom_icon);
+  else
+    shortcut->custom_icon = NULL;
+
+  g_object_notify (G_OBJECT (shortcut), "custom-icon");
 }
 
 
@@ -620,6 +794,9 @@ thunar_shortcut_set_eject_icon (ThunarShortcut *shortcut,
 {
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
   _thunar_return_if_fail (eject_icon == NULL || G_IS_ICON (eject_icon));
+
+  if (eject_icon == NULL && !shortcut->constructed)
+    return;
 
   if (shortcut->eject_icon == eject_icon)
     return;
@@ -652,6 +829,9 @@ thunar_shortcut_set_name (ThunarShortcut *shortcut,
 {
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
 
+  if (name == NULL && !shortcut->constructed)
+    return;
+
   if (g_strcmp0 (shortcut->name, name) == 0)
     return;
 
@@ -660,6 +840,36 @@ thunar_shortcut_set_name (ThunarShortcut *shortcut,
   shortcut->name = g_strdup (name);
 
   g_object_notify (G_OBJECT (shortcut), "name");
+}
+
+
+
+const gchar *
+thunar_shortcut_get_custom_name (ThunarShortcut *shortcut)
+{
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT (shortcut), NULL);
+  return shortcut->custom_name;
+}
+
+
+
+void
+thunar_shortcut_set_custom_name (ThunarShortcut *shortcut,
+                                 const gchar    *custom_name)
+{
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
+
+  if (custom_name == NULL && !shortcut->constructed)
+    return;
+
+  if (g_strcmp0 (shortcut->custom_name, custom_name) == 0)
+    return;
+
+  g_free (shortcut->custom_name);
+
+  shortcut->custom_name = g_strdup (custom_name);
+
+  g_object_notify (G_OBJECT (shortcut), "custom-name");
 }
 
 

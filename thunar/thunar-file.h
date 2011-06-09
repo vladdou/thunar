@@ -100,13 +100,14 @@ typedef enum /*< flags >*/
 #define THUNAR_FILE_EMBLEM_NAME_DESKTOP "emblem-desktop"
 
 /**
- * ThunarFileGetAsyncFunc:
+ * ThunarFileGetFunc:
  *
  * Callback type for loading #ThunarFile<!---->s asynchronously.
  **/
-typedef void (*ThunarFileGetAsyncFunc) (GFile      *location,
-                                        ThunarFile *file,
-                                        GError     *error);
+typedef void (*ThunarFileGetFunc) (GFile      *location,
+                                   ThunarFile *file,
+                                   GError     *error,
+                                   gpointer    user_data);
 
 struct _ThunarFileClass
 {
@@ -142,7 +143,8 @@ ThunarFile       *thunar_file_get_for_uri          (const gchar            *uri,
 
 void              thunar_file_get_async            (GFile                 *location,
                                                     GCancellable          *cancellable,
-                                                    ThunarFileGetAsyncFunc func);
+                                                    ThunarFileGetFunc      func,
+                                                    gpointer               user_data);
 
 gboolean          thunar_file_load                 (ThunarFile             *file,
                                                     GCancellable           *cancellable,
@@ -240,6 +242,7 @@ const gchar     *thunar_file_get_thumbnail_path    (const ThunarFile        *fil
 gboolean         thunar_file_is_thumbnail          (const ThunarFile        *file);
 void             thunar_file_set_thumb_state       (ThunarFile              *file, 
                                                     ThunarFileThumbState     state);
+GIcon            *thunar_file_get_icon             (const ThunarFile        *file);
 GIcon            *thunar_file_get_preview_icon     (const ThunarFile        *file);
 gchar            *thunar_file_get_icon_name        (const ThunarFile        *file,
                                                     ThunarFileIconState     icon_state,

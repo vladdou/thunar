@@ -48,6 +48,9 @@ void               thunar_shortcut_row_set_label         (ThunarShortcutRow *row
 GFile             *thunar_shortcut_row_get_location      (ThunarShortcutRow *row);
 void               thunar_shortcut_row_set_location      (ThunarShortcutRow *row,
                                                           GFile             *location);
+ThunarFile        *thunar_shortcut_row_get_file          (ThunarShortcutRow *row);
+void               thunar_shortcut_row_set_file          (ThunarShortcutRow *row,
+                                                          ThunarFile        *file);
 GVolume           *thunar_shortcut_row_get_volume        (ThunarShortcutRow *row);
 void               thunar_shortcut_row_set_volume        (ThunarShortcutRow *row,
                                                           GVolume           *volume);

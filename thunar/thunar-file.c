@@ -92,6 +92,11 @@ enum
 
 
 
+/* type definition for asynchronous file loading */
+typedef struct _ThunarFileGetData ThunarFileGetData;
+
+
+
 static void               thunar_file_info_init                (ThunarxFileInfoIface   *iface);
 static void               thunar_file_dispose                  (GObject                *object);
 static void               thunar_file_finalize                 (GObject                *object);
@@ -124,6 +129,14 @@ static void               thunar_file_prepare_reload           (ThunarFile      
 static void               thunar_file_finish_reload            (ThunarFile             *file,
                                                                 GCancellable           *cancellable,
                                                                 GError                **error);
+
+
+
+struct _ThunarFileGetData
+{
+  ThunarFileGetFunc func;
+  gpointer          user_data;
+};
 
 
 
@@ -695,11 +708,11 @@ thunar_file_get_async_finish (GObject      *object,
                               GAsyncResult *result,
                               gpointer      user_data)
 {
-  ThunarFileGetAsyncFunc func = user_data;
-  ThunarFile            *file;
-  GFileInfo             *file_info;
-  GError                *error = NULL;
-  GFile                 *location = G_FILE (object);
+  ThunarFileGetData *data = user_data;
+  ThunarFile        *file;
+  GFileInfo         *file_info;
+  GError            *error = NULL;
+  GFile             *location = G_FILE (object);
 
   _thunar_return_if_fail (G_IS_FILE (location));
   _thunar_return_if_fail (G_IS_ASYNC_RESULT (result));
@@ -727,7 +740,7 @@ thunar_file_get_async_finish (GObject      *object,
   G_UNLOCK (file_cache_mutex);
 
   /* pass the loaded file and possible errors to the return function */
-  (func) (location, file, error);
+  (data->func) (location, file, error, data->user_data);
 
   /* free the error, if there is any */
   if (error != NULL)
@@ -735,6 +748,9 @@ thunar_file_get_async_finish (GObject      *object,
 
   /* release the file */
   g_object_unref (file);
+
+  /* release the get data */
+  g_slice_free (ThunarFileGetData, data);
 }
 
 
@@ -743,23 +759,31 @@ thunar_file_get_async_finish (GObject      *object,
  * thunar_file_get_async:
  **/
 void
-thunar_file_get_async (GFile                 *location,
-                       GCancellable          *cancellable,
-                       ThunarFileGetAsyncFunc func)
+thunar_file_get_async (GFile            *location,
+                       GCancellable     *cancellable,
+                       ThunarFileGetFunc func,
+                       gpointer          user_data)
 {
-  ThunarFile *file;
+  ThunarFileGetData *data;
+  ThunarFile        *file;
 
   _thunar_return_if_fail (G_IS_FILE (location));
+  _thunar_return_if_fail (func != NULL);
 
   /* check if we already have a cached version of that file */
   file = thunar_file_cache_lookup (location);
   if (G_UNLIKELY (file != NULL))
     {
       /* call the return function with the file from the cache */
-      (func) (location, file, NULL);
+      (func) (location, file, NULL, user_data);
     }
   else
     {
+      /* allocate get data */
+      data = g_slice_new0 (ThunarFileGetData);
+      data->user_data = user_data;
+      data->func = func;
+
       /* load the file information asynchronously */
       g_file_query_info_async (location,
                                THUNARX_FILE_INFO_NAMESPACE,
@@ -767,7 +791,7 @@ thunar_file_get_async (GFile                 *location,
                                0,
                                cancellable,
                                thunar_file_get_async_finish,
-                               func);
+                               data);
     }
 }
 
@@ -2952,6 +2976,28 @@ thunar_file_get_custom_icon (const ThunarFile *file)
 {
   _thunar_return_val_if_fail (THUNAR_IS_FILE (file), NULL);
   return g_strdup (file->custom_icon_name);
+}
+
+
+
+/**
+ * thunar_file_get_icon:
+ * @file : a #ThunarFile instance.
+ *
+ * Returns the icon for @file if any, else %NULL is returned.
+ *
+ * Return value: the icon for @file or %NULL, the GIcon is owner
+ * by the file, so do not unref it.
+ **/
+GIcon *
+thunar_file_get_icon (const ThunarFile *file)
+{
+  _thunar_return_val_if_fail (THUNAR_IS_FILE (file), NULL);
+
+  if (file->info == NULL)
+    return NULL;
+
+  return g_file_info_get_icon (file->info);
 }
 
 

@@ -126,6 +126,7 @@ static gboolean                thunar_shortcuts_model_find_mount            (Thu
 static void                    thunar_shortcuts_model_add_shortcut          (ThunarShortcutsModel      *model,
                                                                              ThunarShortcut            *shortcut);
 static void                    thunar_shortcuts_model_shortcut_changed      (ThunarShortcutsModel      *model,
+                                                                             GParamSpec                *pspec,
                                                                              ThunarShortcut            *shortcut);
 static gboolean                thunar_shortcuts_model_load_system_shortcuts (gpointer                   user_data);
 static gboolean                thunar_shortcuts_model_load_user_dirs        (gpointer                   user_data);
@@ -400,6 +401,8 @@ thunar_shortcuts_model_get_value (GtkTreeModel *tree_model,
   ThunarShortcutCategory *category;
   ThunarShortcutsModel   *model = THUNAR_SHORTCUTS_MODEL (tree_model);
   ThunarShortcut         *shortcut;
+  const gchar            *name;
+  GIcon                  *icon;
   gint                    category_index;
   gint                    shortcut_index;
 
@@ -419,17 +422,33 @@ thunar_shortcuts_model_get_value (GtkTreeModel *tree_model,
     case THUNAR_SHORTCUTS_MODEL_COLUMN_ICON:
       g_value_init (value, G_TYPE_ICON);
       if (shortcut != NULL)
-        g_value_set_object (value, thunar_shortcut_get_icon (shortcut));
+        {
+          icon = thunar_shortcut_get_custom_icon (shortcut);
+          if (icon == NULL)
+            icon = thunar_shortcut_get_icon (shortcut);
+
+          g_value_set_object (value, icon);
+        }
       else
-        g_value_set_object (value, NULL);
+        {
+          g_value_set_object (value, NULL);
+        }
       break;
 
     case THUNAR_SHORTCUTS_MODEL_COLUMN_NAME:
       g_value_init (value, G_TYPE_STRING);
       if (shortcut != NULL)
-        g_value_set_static_string (value, thunar_shortcut_get_name (shortcut));
+        {
+          name = thunar_shortcut_get_custom_name (shortcut);
+          if (name == NULL)
+            name = thunar_shortcut_get_name (shortcut);
+
+          g_value_set_static_string (value, name);
+        }
       else
-        g_value_set_static_string (value, category->name);
+        {
+          g_value_set_static_string (value, category->name);
+        }
       break;
 
     case THUNAR_SHORTCUTS_MODEL_COLUMN_LOCATION:
@@ -1143,7 +1162,7 @@ thunar_shortcuts_model_add_shortcut (ThunarShortcutsModel *model,
   gtk_tree_path_free (path);
 
   /* be notified whenever the shortcut changes */
-  g_signal_connect_swapped (shortcut, "changed", 
+  g_signal_connect_swapped (shortcut, "notify", 
                             G_CALLBACK (thunar_shortcuts_model_shortcut_changed),
                             model);
 }
@@ -1152,6 +1171,7 @@ thunar_shortcuts_model_add_shortcut (ThunarShortcutsModel *model,
 
 static void
 thunar_shortcuts_model_shortcut_changed (ThunarShortcutsModel *model,
+                                         GParamSpec           *pspec,
                                          ThunarShortcut       *shortcut)
 {
   GtkTreePath *path;
@@ -1190,7 +1210,7 @@ thunar_shortcuts_model_load_system_shortcuts (gpointer user_data)
   GFile                *home_file;
   GFile                *location;
   GIcon                *icon;
-  gchar                *name;
+  gchar                *name = NULL;
   gchar                *path;
 
   _thunar_return_val_if_fail (THUNAR_IS_SHORTCUTS_MODEL (model), FALSE);
@@ -1201,15 +1221,13 @@ thunar_shortcuts_model_load_system_shortcuts (gpointer user_data)
   /* create $HOME information */
   icon = g_themed_icon_new ("user-home");
   path = g_file_get_path (home_file);
-  name = g_filename_display_basename (path);
   
   /* create the $HOME shortcut */
   shortcut = g_object_new (THUNAR_TYPE_SHORTCUT,
                            "shortcut-type", THUNAR_SHORTCUT_REGULAR_FILE,
                            "location", home_file,
                            "icon", icon,
-                           "eject-icon", NULL,
-                           "name", name,
+                           "custom-name", NULL,
                            "hidden", FALSE,
                            "mutable", FALSE,
                            "persistent", TRUE,
@@ -1219,7 +1237,6 @@ thunar_shortcuts_model_load_system_shortcuts (gpointer user_data)
   thunar_shortcuts_model_add_shortcut (model, shortcut);
 
   /* release $HOME information */
-  g_free (name);
   g_free (path);
   g_object_unref (icon);
 
@@ -1238,8 +1255,7 @@ thunar_shortcuts_model_load_system_shortcuts (gpointer user_data)
                                "shortcut-type", THUNAR_SHORTCUT_REGULAR_FILE,
                                "location", location,
                                "icon", icon,
-                               "eject-icon", NULL,
-                               "name", name,
+                               "custom-name", name,
                                "hidden", FALSE,
                                "mutable", FALSE,
                                "persistent", TRUE,
@@ -1267,8 +1283,7 @@ thunar_shortcuts_model_load_system_shortcuts (gpointer user_data)
                            "shortcut-type", THUNAR_SHORTCUT_REGULAR_FILE,
                            "location", location,
                            "icon", icon,
-                           "eject-icon", NULL,
-                           "name", name,
+                           "custom-name", name,
                            "hidden", FALSE,
                            "mutable", FALSE,
                            "persistent", TRUE,
@@ -1295,8 +1310,7 @@ thunar_shortcuts_model_load_system_shortcuts (gpointer user_data)
                            "shortcut-type", THUNAR_SHORTCUT_NETWORK_FILE,
                            "location", location,
                            "icon", icon,
-                           "eject-icon", NULL,
-                           "name", name,
+                           "custom-name", name,
                            "hidden", FALSE,
                            "mutable", FALSE,
                            "persistent", TRUE,
@@ -1348,7 +1362,6 @@ thunar_shortcuts_model_load_bookmarks (gpointer user_data)
   gchar                *bookmarks_path;
   gchar                 line[2048];
   gchar                *name;
-  gchar                *unescaped_uri;
   FILE                 *fp;
 
   _thunar_return_val_if_fail (THUNAR_IS_SHORTCUTS_MODEL (model), FALSE);
@@ -1389,17 +1402,8 @@ thunar_shortcuts_model_load_bookmarks (gpointer user_data)
               /* parse the URI */
               location = g_file_new_for_uri (line);
 
-              /* use the base name as a fallback for the display name */
-              if (*name != '\0')
-                {
-                  name = g_strdup (name);
-                }
-              else
-                {
-                  unescaped_uri = g_uri_unescape_string (line, NULL);
-                  name = g_filename_display_basename (unescaped_uri);
-                  g_free (unescaped_uri);
-                }
+              /* only set the name property if the name is not empty */
+              name = *name != '\0' ? g_strdup (name) : NULL;
 
               /* set initial icon and type based on the URI scheme */
               is_local = g_file_has_uri_scheme (location, "file");
@@ -1420,7 +1424,7 @@ thunar_shortcuts_model_load_bookmarks (gpointer user_data)
                                        "location", location,
                                        "icon", icon,
                                        "eject-icon", eject_icon,
-                                       "name", name,
+                                       "custom-name", name,
                                        "hidden", FALSE,
                                        "mutable", TRUE,
                                        "persistent", TRUE,
@@ -1521,17 +1525,13 @@ thunar_shortcuts_model_volume_added (ThunarShortcutsModel *model,
   ThunarShortcut *shortcut;
   gboolean        hidden = FALSE;
   GIcon          *eject_icon;
-  GIcon          *icon;
-  gchar          *name;
 
   _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_MODEL (model));
   _thunar_return_if_fail (G_IS_VOLUME (volume));
   _thunar_return_if_fail (G_IS_VOLUME_MONITOR (monitor));
 
   /* read information from the volume */
-  icon = g_volume_get_icon (volume);
   eject_icon = g_themed_icon_new ("media-eject");
-  name = g_volume_get_name (volume);
 
   /* hide the volume if there is no media */
   if (!thunar_g_volume_is_present (volume))
@@ -1546,9 +1546,7 @@ thunar_shortcuts_model_volume_added (ThunarShortcutsModel *model,
   shortcut = g_object_new (THUNAR_TYPE_SHORTCUT,
                            "shortcut-type", THUNAR_SHORTCUT_REGULAR_VOLUME,
                            "volume", volume,
-                           "icon", icon,
                            "eject-icon", eject_icon,
-                           "name", name,
                            "hidden", hidden,
                            "mutable", FALSE,
                            "persistent", FALSE,
@@ -1558,9 +1556,7 @@ thunar_shortcuts_model_volume_added (ThunarShortcutsModel *model,
   thunar_shortcuts_model_add_shortcut (model, shortcut);
 
   /* release volume information */
-  g_free (name);
   g_object_unref (eject_icon);
-  g_object_unref (icon);
 }
 
 
@@ -1609,8 +1605,6 @@ thunar_shortcuts_model_mount_added (ThunarShortcutsModel *model,
   GVolume        *volume;
   GFile          *location;
   GIcon          *eject_icon;
-  GIcon          *icon;
-  gchar          *name;
 
   _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_MODEL (model));
   _thunar_return_if_fail (G_IS_MOUNT (mount));
@@ -1627,18 +1621,14 @@ thunar_shortcuts_model_mount_added (ThunarShortcutsModel *model,
     {
       /* read information from the mount */
       location = g_mount_get_root (mount);
-      icon = g_mount_get_icon (mount);
       eject_icon = g_themed_icon_new ("media-eject");
-      name = g_mount_get_name (mount);
 
       /* create a shortcut for the mount */
       shortcut = g_object_new (THUNAR_TYPE_SHORTCUT,
                                "shortcut-type", THUNAR_SHORTCUT_STANDALONE_MOUNT,
                                "location", location,
                                "mount", mount,
-                               "icon", icon,
                                "eject-icon", eject_icon,
-                               "name", name,
                                "hidden", FALSE,
                                "mutable", FALSE,
                                "persistent", FALSE,
@@ -1648,9 +1638,7 @@ thunar_shortcuts_model_mount_added (ThunarShortcutsModel *model,
       thunar_shortcuts_model_add_shortcut (model, shortcut);
 
       /* release volume information */
-      g_free (name);
       g_object_unref (eject_icon);
-      g_object_unref (icon);
       g_object_unref (location);
     }
 }

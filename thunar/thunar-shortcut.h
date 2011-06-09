@@ -54,12 +54,18 @@ void               thunar_shortcut_set_mount         (ThunarShortcut    *shortcu
 GIcon             *thunar_shortcut_get_icon          (ThunarShortcut    *shortcut);
 void               thunar_shortcut_set_icon          (ThunarShortcut    *shortcut,
                                                       GIcon             *icon);
+GIcon             *thunar_shortcut_get_custom_icon   (ThunarShortcut    *shortcut);
+void               thunar_shortcut_set_custom_icon   (ThunarShortcut    *shortcut,
+                                                      GIcon             *custom_icon);
 GIcon             *thunar_shortcut_get_eject_icon    (ThunarShortcut    *shortcut);
 void               thunar_shortcut_set_eject_icon    (ThunarShortcut    *shortcut,
                                                       GIcon             *eject_icon);
 const gchar       *thunar_shortcut_get_name          (ThunarShortcut    *shortcut);
 void               thunar_shortcut_set_name          (ThunarShortcut    *shortcut,
                                                       const gchar       *name);
+const gchar       *thunar_shortcut_get_custom_name   (ThunarShortcut    *shortcut);
+void               thunar_shortcut_set_custom_name   (ThunarShortcut    *shortcut,
+                                                      const gchar       *custom_name);
 ThunarShortcutType thunar_shortcut_get_shortcut_type (ThunarShortcut    *shortcut);
 void               thunar_shortcut_set_shortcut_type (ThunarShortcut    *shortcut,
                                                       ThunarShortcutType shortcut_type);

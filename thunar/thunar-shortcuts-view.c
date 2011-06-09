@@ -514,6 +514,7 @@ thunar_shortcuts_view_row_changed (ThunarShortcutsView *view,
                                    GtkTreeModel        *model)
 {
   ThunarShortcutRow *row;
+  ThunarFile        *file;
   GtkWidget         *expander;
   GtkWidget         *box;
   GIcon             *icon;
@@ -550,21 +551,21 @@ thunar_shortcuts_view_row_changed (ThunarShortcutsView *view,
       row = THUNAR_SHORTCUT_ROW (row_element->data);
 
       /* read updated information from the tree row */
-      /* TODO also read the ThunarFile if we have one etc. */
       gtk_tree_model_get (model, iter,
                           THUNAR_SHORTCUTS_MODEL_COLUMN_NAME, &name,
                           THUNAR_SHORTCUTS_MODEL_COLUMN_ICON, &icon,
+                          THUNAR_SHORTCUTS_MODEL_COLUMN_FILE, &file,
                           -1);
 
       /* update the row */
-      g_object_set (row,
-                    "name", name,
-                    "icon", icon,
-                    NULL);
+      g_object_set (row, "label", name, "icon", icon, "file", file, NULL);
 
       /* release the values */
       g_free (name);
-      g_object_unref (icon);
+      if (icon != NULL)
+        g_object_unref (icon);
+      if (file != NULL)
+        g_object_unref (file);
     }
 
   /* free the row list */
