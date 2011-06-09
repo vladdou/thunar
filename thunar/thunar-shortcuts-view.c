@@ -74,52 +74,59 @@ typedef void (*ThunarShortcutsViewForeachRowFunc) (ThunarShortcutsView *view,
 
 
 
-static void       thunar_shortcuts_view_constructed              (GObject                          *object);
-static void       thunar_shortcuts_view_finalize                 (GObject                          *object);
-static void       thunar_shortcuts_view_get_property             (GObject                          *object,
-                                                                  guint                             prop_id,
-                                                                  GValue                           *value,
-                                                                  GParamSpec                       *pspec);
-static void       thunar_shortcuts_view_set_property             (GObject                          *object,
-                                                                  guint                             prop_id,
-                                                                  const GValue                     *value,
-                                                                  GParamSpec                       *pspec);
-static void       thunar_shortcuts_view_row_inserted             (ThunarShortcutsView              *view,
-                                                                  GtkTreePath                      *path,
-                                                                  GtkTreeIter                      *iter,
-                                                                  GtkTreeModel                     *model);
-static void       thunar_shortcuts_view_row_deleted              (ThunarShortcutsView              *view,
-                                                                  GtkTreePath                      *path,
-                                                                  GtkTreeModel                     *model);
-static void       thunar_shortcuts_view_row_changed              (ThunarShortcutsView              *view,
-                                                                  GtkTreePath                      *path,
-                                                                  GtkTreeIter                      *iter,
-                                                                  GtkTreeModel                     *model);
-static GtkWidget *thunar_shortcuts_view_get_expander_at          (ThunarShortcutsView              *view,
-                                                                  gint                              index);
-static void       thunar_shortcuts_view_row_activated            (ThunarShortcutsView              *view,
-                                                                  ThunarFile                       *file,
-                                                                  ThunarShortcutRow                *row);
-static void       thunar_shortcuts_view_row_state_changed        (ThunarShortcutsView              *view,
-                                                                  GtkStateType                      previous_state,
-                                                                  ThunarShortcutRow                *row);
-static gboolean   thunar_shortcuts_view_row_context_menu         (ThunarShortcutsView              *view,
-                                                                  GtkWidget                        *widget);
-static void       thunar_shortcuts_view_open                     (ThunarShortcutsView              *view,
-                                                                  ThunarFile                       *file,
-                                                                  gboolean                          new_window);
-static void       thunar_shortcuts_view_foreach_row              (ThunarShortcutsView              *view,
-                                                                  ThunarShortcutsViewForeachRowFunc func,
-                                                                  gpointer                          user_data);
-static void       thunar_shortcuts_view_unselect_rows            (ThunarShortcutsView              *view,
-                                                                  ThunarShortcutRow                *row,
-                                                                  gpointer                          user_data);
-static void       thunar_shortcuts_view_unprelight_rows          (ThunarShortcutsView              *view,
-                                                                  ThunarShortcutRow                *row,
-                                                                  gpointer                          user_data);
-static void       thunar_shortcuts_view_update_selection_by_file (ThunarShortcutsView              *view,
-                                                                  ThunarShortcutRow                *row,
-                                                                  gpointer                          user_data);
+static void               thunar_shortcuts_view_constructed              (GObject                          *object);
+static void               thunar_shortcuts_view_finalize                 (GObject                          *object);
+static void               thunar_shortcuts_view_get_property             (GObject                          *object,
+                                                                          guint                             prop_id,
+                                                                          GValue                           *value,
+                                                                          GParamSpec                       *pspec);
+static void               thunar_shortcuts_view_set_property             (GObject                          *object,
+                                                                          guint                             prop_id,
+                                                                          const GValue                     *value,
+                                                                          GParamSpec                       *pspec);
+static void               thunar_shortcuts_view_row_inserted             (ThunarShortcutsView              *view,
+                                                                          GtkTreePath                      *path,
+                                                                          GtkTreeIter                      *iter,
+                                                                          GtkTreeModel                     *model);
+static void               thunar_shortcuts_view_row_deleted              (ThunarShortcutsView              *view,
+                                                                          GtkTreePath                      *path,
+                                                                          GtkTreeModel                     *model);
+static void               thunar_shortcuts_view_row_changed              (ThunarShortcutsView              *view,
+                                                                          GtkTreePath                      *path,
+                                                                          GtkTreeIter                      *iter,
+                                                                          GtkTreeModel                     *model);
+static GtkWidget *        thunar_shortcuts_view_get_expander_at          (ThunarShortcutsView              *view,
+                                                                          gint                              index);
+static void               thunar_shortcuts_view_row_activated            (ThunarShortcutsView              *view,
+                                                                          ThunarFile                       *file,
+                                                                          gboolean                          open_in_new_window,
+                                                                          ThunarShortcutRow                *row);
+static void               thunar_shortcuts_view_row_state_changed        (ThunarShortcutsView              *view,
+                                                                          GtkStateType                      previous_state,
+                                                                          ThunarShortcutRow                *row);
+static gboolean           thunar_shortcuts_view_row_context_menu         (ThunarShortcutsView              *view,
+                                                                          GtkWidget                        *widget);
+static void               thunar_shortcuts_view_row_open                 (ThunarShortcutsView              *view);
+static void               thunar_shortcuts_view_row_open_new_window      (ThunarShortcutsView              *view);
+static void               thunar_shortcuts_view_open                     (ThunarShortcutsView              *view,
+                                                                          ThunarFile                       *file,
+                                                                          gboolean                          new_window);
+static ThunarShortcutRow *thunar_shortcuts_view_get_selected_row         (ThunarShortcutsView              *view);
+static void               thunar_shortcuts_view_find_selected_row        (ThunarShortcutsView              *view,
+                                                                          ThunarShortcutRow                *row,
+                                                                          gpointer                          user_data);
+static void               thunar_shortcuts_view_foreach_row              (ThunarShortcutsView              *view,
+                                                                          ThunarShortcutsViewForeachRowFunc func,
+                                                                          gpointer                          user_data);
+static void               thunar_shortcuts_view_unselect_rows            (ThunarShortcutsView              *view,
+                                                                          ThunarShortcutRow                *row,
+                                                                          gpointer                          user_data);
+static void               thunar_shortcuts_view_unprelight_rows          (ThunarShortcutsView              *view,
+                                                                          ThunarShortcutRow                *row,
+                                                                          gpointer                          user_data);
+static void               thunar_shortcuts_view_update_selection_by_file (ThunarShortcutsView              *view,
+                                                                          ThunarShortcutRow                *row,
+                                                                          gpointer                          user_data);
 
 
 
@@ -144,10 +151,6 @@ static guint view_signals[LAST_SIGNAL];
 
 
 
-static GQuark thunar_shortcuts_view_row_quark;
-
-
-
 G_DEFINE_TYPE_WITH_CODE (ThunarShortcutsView, thunar_shortcuts_view, GTK_TYPE_EVENT_BOX,
                          G_IMPLEMENT_INTERFACE (THUNAR_TYPE_BROWSER, NULL))
 
@@ -157,9 +160,6 @@ static void
 thunar_shortcuts_view_class_init (ThunarShortcutsViewClass *klass)
 {
   GObjectClass   *gobject_class;
-
-  /* initialize the row quark */
-  thunar_shortcuts_view_row_quark = g_quark_from_static_string ("thunar-shortcuts-view-row");
 
   gobject_class = G_OBJECT_CLASS (klass);
   gobject_class->constructed = thunar_shortcuts_view_constructed;
@@ -626,13 +626,14 @@ thunar_shortcuts_view_get_expander_at (ThunarShortcutsView *view,
 static void
 thunar_shortcuts_view_row_activated (ThunarShortcutsView *view,
                                      ThunarFile          *file,
+                                     gboolean             open_in_new_window,
                                      ThunarShortcutRow   *row)
 {
   _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
   _thunar_return_if_fail (THUNAR_IS_FILE (file));
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
 
-  thunar_shortcuts_view_open (view, file, FALSE);
+  thunar_shortcuts_view_open (view, file, open_in_new_window);
 }
 
 
@@ -686,7 +687,8 @@ thunar_shortcuts_view_row_context_menu (ThunarShortcutsView *view,
 
   /* append the "Open" menu action */
   item = gtk_image_menu_item_new_with_mnemonic (_("_Open"));
-  g_object_set_qdata (G_OBJECT (item), thunar_shortcuts_view_row_quark, row);
+  g_signal_connect_swapped (item, "activate",
+                            G_CALLBACK (thunar_shortcuts_view_row_open), view);
   gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
   gtk_widget_show (item);
 
@@ -697,7 +699,9 @@ thunar_shortcuts_view_row_context_menu (ThunarShortcutsView *view,
 
   /* append the "Open in New Window" menu action */
   item = gtk_image_menu_item_new_with_mnemonic (_("Open in New Window"));
-  g_object_set_qdata (G_OBJECT (item), thunar_shortcuts_view_row_quark, row);
+  g_signal_connect_swapped (item, "activate",
+                            G_CALLBACK (thunar_shortcuts_view_row_open_new_window),
+                            view);
   gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
   gtk_widget_show (item);
 
@@ -714,7 +718,6 @@ thunar_shortcuts_view_row_context_menu (ThunarShortcutsView *view,
     {
       /* append the "Disconnect" item */
       item = gtk_image_menu_item_new_with_mnemonic (_("Disconn_ect"));
-      g_object_set_qdata (G_OBJECT (item), thunar_shortcuts_view_row_quark, row);
       gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
       gtk_widget_show (item);
 
@@ -734,7 +737,6 @@ thunar_shortcuts_view_row_context_menu (ThunarShortcutsView *view,
       /* check if we have a mounted volume */
       /* append the "Mount" item */
       item = gtk_image_menu_item_new_with_mnemonic (_("_Mount"));
-      g_object_set_qdata (G_OBJECT (item), thunar_shortcuts_view_row_quark, row);
       gtk_widget_set_sensitive (item, !thunar_g_volume_is_mounted (volume));
       gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
       gtk_widget_show (item);
@@ -743,7 +745,6 @@ thunar_shortcuts_view_row_context_menu (ThunarShortcutsView *view,
         {
           /* append the "Unmount" item */
           item = gtk_image_menu_item_new_with_mnemonic (_("_Unmount"));
-          g_object_set_qdata (G_OBJECT (item), thunar_shortcuts_view_row_quark, row);
           gtk_widget_set_sensitive (item, thunar_g_volume_is_mounted (volume));
           gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
           gtk_widget_show (item);
@@ -751,7 +752,6 @@ thunar_shortcuts_view_row_context_menu (ThunarShortcutsView *view,
 
       /* append the "Disconnect" (eject + safely remove drive) item */
       item = gtk_image_menu_item_new_with_mnemonic (_("Disconn_ect"));
-      g_object_set_qdata (G_OBJECT (item), thunar_shortcuts_view_row_quark, row);
       gtk_widget_set_sensitive (item, thunar_g_volume_is_mounted (volume));
       gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
       gtk_widget_show (item);
@@ -768,7 +768,6 @@ thunar_shortcuts_view_row_context_menu (ThunarShortcutsView *view,
     {
       /* append the "Empty Trash" menu action */
       item = gtk_image_menu_item_new_with_mnemonic (_("_Empty Trash"));
-      g_object_set_qdata (G_OBJECT (item), thunar_shortcuts_view_row_quark, row);
       gtk_widget_set_sensitive (item, (thunar_file_get_item_count (file) > 0));
       gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
       gtk_widget_show (item);
@@ -853,6 +852,68 @@ thunar_shortcuts_view_row_context_menu (ThunarShortcutsView *view,
                        0, gtk_get_current_event_time ());
 
   return TRUE;
+}
+
+
+
+static void
+thunar_shortcuts_view_row_open (ThunarShortcutsView *view)
+{
+  ThunarShortcutRow *row;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
+
+  row = thunar_shortcuts_view_get_selected_row (view);
+
+  if (row != NULL)
+    thunar_shortcut_row_resolve_and_activate (row, FALSE);
+}
+
+
+
+static void
+thunar_shortcuts_view_row_open_new_window (ThunarShortcutsView *view)
+{
+  ThunarShortcutRow *row;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
+
+  row = thunar_shortcuts_view_get_selected_row (view);
+
+  if (row != NULL)
+    thunar_shortcut_row_resolve_and_activate (row, TRUE);
+}
+
+
+
+static ThunarShortcutRow *
+thunar_shortcuts_view_get_selected_row (ThunarShortcutsView *view)
+{
+  ThunarShortcutRow *result = NULL;
+
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view), NULL);
+
+  thunar_shortcuts_view_foreach_row (view, thunar_shortcuts_view_find_selected_row,
+                                     &result);
+
+  return result;
+}
+
+
+
+static void
+thunar_shortcuts_view_find_selected_row (ThunarShortcutsView *view,
+                                         ThunarShortcutRow   *row,
+                                         gpointer             user_data)
+{
+  ThunarShortcutRow **return_value = user_data;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
+  _thunar_return_if_fail (return_value != NULL);
+
+  if (gtk_widget_get_state (GTK_WIDGET (row)) == GTK_STATE_SELECTED)
+    *return_value = row;
 }
 
 

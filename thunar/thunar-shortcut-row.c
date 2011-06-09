@@ -34,6 +34,7 @@
 #include <thunar/thunar-enum-types.h>
 #include <thunar/thunar-file.h>
 #include <thunar/thunar-gio-extensions.h>
+#include <thunar/thunar-marshal.h>
 #include <thunar/thunar-preferences.h>
 #include <thunar/thunar-private.h>
 #include <thunar/thunar-shortcut-row.h>
@@ -126,13 +127,12 @@ static void     thunar_shortcut_row_poke_volume_finish    (ThunarBrowser        
                                                            GVolume               *volume,
                                                            ThunarFile            *file,
                                                            GError                *error,
-                                                           gpointer               unused);
+                                                           gpointer               user_data);
 static void     thunar_shortcut_row_poke_file_finish      (ThunarBrowser         *browser,
                                                            ThunarFile            *file,
                                                            ThunarFile            *target_file,
                                                            GError                *error,
-                                                           gpointer               unused);
-static void     thunar_shortcut_row_resolve_and_activate  (ThunarShortcutRow     *row);
+                                                           gpointer               user_data);
 static void     thunar_shortcut_row_icon_changed          (ThunarShortcutRow     *row);
 static void     thunar_shortcut_row_label_changed         (ThunarShortcutRow     *row);
 static void     thunar_shortcut_row_location_changed      (ThunarShortcutRow     *row);
@@ -301,8 +301,10 @@ thunar_shortcut_row_class_init (ThunarShortcutRowClass *klass)
                   G_TYPE_FROM_CLASS (klass),
                   G_SIGNAL_RUN_LAST,
                   0, NULL, NULL,
-                  g_cclosure_marshal_VOID__OBJECT,
-                  G_TYPE_NONE, 1, THUNAR_TYPE_FILE);
+                  _thunar_marshal_VOID__OBJECT_BOOLEAN,
+                  G_TYPE_NONE, 2, 
+                  THUNAR_TYPE_FILE,
+                  G_TYPE_BOOLEAN);
 
   row_signals[SIGNAL_CONTEXT_MENU] =
     g_signal_new (I_("context-menu"),
@@ -572,38 +574,36 @@ thunar_shortcut_row_button_press_event (GtkWidget      *widget,
 
   _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT_ROW (widget), FALSE);
 
-  /* distinguish between left, right and middle-click */
+  /* determine the widget's state */
+  state = gtk_widget_get_state (widget);
+
+  if (state == GTK_STATE_SELECTED)
+    {
+      if ((event->state & GDK_CONTROL_MASK) != 0)
+        gtk_widget_set_state (widget, GTK_STATE_NORMAL);
+    }
+  else
+    {
+      gtk_widget_set_state (widget, GTK_STATE_SELECTED);
+      gtk_widget_grab_focus (widget);
+    }
+
+  /* distinguish between left, right and middle click */
   if (event->button == 1)
     {
-      /* determine the widget's state */
-      state = gtk_widget_get_state (widget);
-
-      if (state == GTK_STATE_SELECTED)
-        {
-          if ((event->state & GDK_CONTROL_MASK) != 0)
-            gtk_widget_set_state (widget, GTK_STATE_NORMAL);
-        }
-      else
-        {
-          gtk_widget_set_state (widget, GTK_STATE_SELECTED);
-          gtk_widget_grab_focus (widget);
-        }
-
       /* resolve (e.g. mount) the shortcut and activate it */
       if (gtk_widget_get_state (widget) == GTK_STATE_SELECTED)
-        thunar_shortcut_row_resolve_and_activate (THUNAR_SHORTCUT_ROW (widget));
+        thunar_shortcut_row_resolve_and_activate (THUNAR_SHORTCUT_ROW (widget), FALSE);
     }
   else if (event->button == 3)
     {
-      /* TODO emit a context-menu signal or something similar here */
+      /* TODO start a context menu timeout */
       g_debug ("right button press");
-      return FALSE;
     }
   else if (event->button == 2)
     {
       /* TODO we don't handle middle-click events yet */
       g_debug ("middle button press");
-      return FALSE;
     }
 
   return TRUE;
@@ -640,6 +640,8 @@ static gboolean
 thunar_shortcut_row_key_press_event (GtkWidget   *widget,
                                      GdkEventKey *event)
 {
+  gboolean new_window;
+
   _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT_ROW (widget), FALSE);
 
   if (event->keyval == GDK_KEY_Return
@@ -647,7 +649,11 @@ thunar_shortcut_row_key_press_event (GtkWidget   *widget,
       || event->keyval == GDK_KEY_space
       || event->keyval== GDK_KEY_KP_Space)
     {
-      thunar_shortcut_row_resolve_and_activate (THUNAR_SHORTCUT_ROW (widget));
+      new_window = (event->state & GDK_CONTROL_MASK) != 0;
+
+      thunar_shortcut_row_resolve_and_activate (THUNAR_SHORTCUT_ROW (widget), 
+                                                new_window);
+
       return TRUE;
     }
 
@@ -1049,9 +1055,10 @@ thunar_shortcut_row_poke_volume_finish (ThunarBrowser *browser,
                                         GVolume       *volume,
                                         ThunarFile    *file,
                                         GError        *error,
-                                        gpointer       unused)
+                                        gpointer       user_data)
 {
   ThunarShortcutRow *row = THUNAR_SHORTCUT_ROW (browser);
+  gboolean           open_in_new_window = GPOINTER_TO_UINT (user_data);
 
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (browser));
   _thunar_return_if_fail (G_IS_VOLUME (volume));
@@ -1059,7 +1066,7 @@ thunar_shortcut_row_poke_volume_finish (ThunarBrowser *browser,
 
   if (error == NULL)
     {
-      g_signal_emit (row, row_signals[SIGNAL_ACTIVATED], 0, file);
+      g_signal_emit (row, row_signals[SIGNAL_ACTIVATED], 0, file, open_in_new_window);
     }
   else
     {
@@ -1079,9 +1086,10 @@ thunar_shortcut_row_poke_file_finish (ThunarBrowser *browser,
                                         ThunarFile    *file,
                                         ThunarFile    *target_file,
                                         GError        *error,
-                                        gpointer       unused)
+                                        gpointer       user_data)
 {
   ThunarShortcutRow *row = THUNAR_SHORTCUT_ROW (browser);
+  gboolean           open_in_new_window = GPOINTER_TO_UINT (user_data);
 
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (browser));
   _thunar_return_if_fail (THUNAR_IS_FILE (file));
@@ -1089,7 +1097,8 @@ thunar_shortcut_row_poke_file_finish (ThunarBrowser *browser,
 
   if (error == NULL)
     {
-      g_signal_emit (row, row_signals[SIGNAL_ACTIVATED], 0, target_file);
+      g_signal_emit (row, row_signals[SIGNAL_ACTIVATED], 0, target_file, 
+                     open_in_new_window);
     }
   else
     {
@@ -1104,8 +1113,9 @@ thunar_shortcut_row_poke_file_finish (ThunarBrowser *browser,
 
 
 
-static void
-thunar_shortcut_row_resolve_and_activate (ThunarShortcutRow *row)
+void
+thunar_shortcut_row_resolve_and_activate (ThunarShortcutRow *row,
+                                          gboolean           open_in_new_window)
 {
   ThunarFile *file;
   GError     *error = NULL;
@@ -1119,7 +1129,7 @@ thunar_shortcut_row_resolve_and_activate (ThunarShortcutRow *row)
 
       thunar_browser_poke_volume (THUNAR_BROWSER (row), row->volume, row,
                                   thunar_shortcut_row_poke_volume_finish,
-                                  NULL);
+                                  GUINT_TO_POINTER (open_in_new_window));
     }
   else if (row->location != NULL)
     {
@@ -1131,7 +1141,7 @@ thunar_shortcut_row_resolve_and_activate (ThunarShortcutRow *row)
 
           thunar_browser_poke_file (THUNAR_BROWSER (row), file, row,
                                     thunar_shortcut_row_poke_file_finish,
-                                    NULL);
+                                    GUINT_TO_POINTER (open_in_new_window));
 
           g_object_unref (file);
         }
