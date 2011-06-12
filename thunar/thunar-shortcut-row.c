@@ -1662,3 +1662,65 @@ thunar_shortcut_row_set_icon_size (ThunarShortcutRow *row,
 
   g_object_notify (G_OBJECT (row), "icon-size");
 }
+
+
+
+void
+thunar_shortcut_row_disconnect_mount (ThunarShortcutRow *row)
+{
+  GMountOperation *mount_operation;
+  GtkWidget       *toplevel;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
+  _thunar_return_if_fail (row->shortcut_type == THUNAR_SHORTCUT_STANDALONE_MOUNT);
+
+  if (row->shortcut_type != THUNAR_SHORTCUT_STANDALONE_MOUNT)
+    return;
+
+  if (row->mount == NULL)
+    {
+      /* something is out of sync */
+      return;
+    }
+
+  /* create a mount operation */
+  toplevel = gtk_widget_get_toplevel (GTK_WIDGET (row));
+  mount_operation = gtk_mount_operation_new (GTK_WINDOW (toplevel));
+  gtk_mount_operation_set_screen (GTK_MOUNT_OPERATION (mount_operation),
+                                  gtk_widget_get_screen (GTK_WIDGET (row)));
+
+  /* distinguish between mountable and ejectable mounts */
+  if (g_mount_can_unmount (row->mount))
+    {
+      /* start spinning */
+      thunar_shortcut_row_set_spinning (row, TRUE, THUNAR_SHORTCUT_ROW_EJECTING);
+
+      /* try unmounting the mount */
+      g_mount_unmount_with_operation (row->mount,
+                                      G_MOUNT_UNMOUNT_NONE,
+                                      mount_operation,
+                                      row->cancellable,
+                                      thunar_shortcut_row_mount_unmount_finish,
+                                      row);
+    }
+  else if (g_mount_can_eject (row->mount))
+    {
+      /* start spinning */
+      thunar_shortcut_row_set_spinning (row, TRUE, THUNAR_SHORTCUT_ROW_EJECTING);
+
+      /* try ejecting the mount */
+      g_mount_eject_with_operation (row->mount,
+                                    G_MOUNT_UNMOUNT_NONE,
+                                    mount_operation,
+                                    row->cancellable,
+                                    thunar_shortcut_row_mount_eject_finish,
+                                    row);
+    }
+  else
+    {
+      /* something is out of sync... */
+    }
+
+  /* release the mount operation */
+  g_object_unref (mount_operation);
+}

@@ -108,6 +108,7 @@ static gboolean           thunar_shortcuts_view_row_context_menu         (Thunar
                                                                           GtkWidget                        *widget);
 static void               thunar_shortcuts_view_row_open                 (ThunarShortcutsView              *view);
 static void               thunar_shortcuts_view_row_open_new_window      (ThunarShortcutsView              *view);
+static void               thunar_shortcuts_view_row_disconnect_mount     (ThunarShortcutsView              *view);
 static void               thunar_shortcuts_view_open                     (ThunarShortcutsView              *view,
                                                                           ThunarFile                       *file,
                                                                           gboolean                          new_window);
@@ -729,6 +730,9 @@ thunar_shortcuts_view_row_context_menu (ThunarShortcutsView *view,
     {
       /* append the "Disconnect" item */
       item = gtk_image_menu_item_new_with_mnemonic (_("Disconn_ect"));
+      g_signal_connect_swapped (item, "activate",
+                                G_CALLBACK (thunar_shortcuts_view_row_disconnect_mount),
+                                view);
       gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
       gtk_widget_show (item);
 
@@ -893,6 +897,21 @@ thunar_shortcuts_view_row_open_new_window (ThunarShortcutsView *view)
 
   if (row != NULL)
     thunar_shortcut_row_resolve_and_activate (row, TRUE);
+}
+
+
+
+static void
+thunar_shortcuts_view_row_disconnect_mount (ThunarShortcutsView *view)
+{
+  ThunarShortcutRow *row;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
+
+  row = thunar_shortcuts_view_get_selected_row (view);
+
+  if (row != NULL)
+    thunar_shortcut_row_disconnect_mount (row);
 }
 
 

@@ -64,6 +64,7 @@ void               thunar_shortcut_row_set_icon_size        (ThunarShortcutRow *
                                                              ThunarIconSize     icon_size);
 void               thunar_shortcut_row_resolve_and_activate (ThunarShortcutRow *row,
                                                              gboolean           open_in_new_window);
+void               thunar_shortcut_row_disconnect_mount     (ThunarShortcutRow *row);
 
 G_END_DECLS
 
