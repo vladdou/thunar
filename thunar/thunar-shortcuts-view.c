@@ -108,7 +108,9 @@ static gboolean           thunar_shortcuts_view_row_context_menu         (Thunar
                                                                           GtkWidget                        *widget);
 static void               thunar_shortcuts_view_row_open                 (ThunarShortcutsView              *view);
 static void               thunar_shortcuts_view_row_open_new_window      (ThunarShortcutsView              *view);
-static void               thunar_shortcuts_view_row_disconnect_mount     (ThunarShortcutsView              *view);
+static void               thunar_shortcuts_view_row_disconnect           (ThunarShortcutsView              *view);
+static void               thunar_shortcuts_view_row_mount                (ThunarShortcutsView              *view);
+static void               thunar_shortcuts_view_row_unmount              (ThunarShortcutsView              *view);
 static void               thunar_shortcuts_view_open                     (ThunarShortcutsView              *view,
                                                                           ThunarFile                       *file,
                                                                           gboolean                          new_window);
@@ -731,7 +733,7 @@ thunar_shortcuts_view_row_context_menu (ThunarShortcutsView *view,
       /* append the "Disconnect" item */
       item = gtk_image_menu_item_new_with_mnemonic (_("Disconn_ect"));
       g_signal_connect_swapped (item, "activate",
-                                G_CALLBACK (thunar_shortcuts_view_row_disconnect_mount),
+                                G_CALLBACK (thunar_shortcuts_view_row_disconnect),
                                 view);
       gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
       gtk_widget_show (item);
@@ -753,6 +755,9 @@ thunar_shortcuts_view_row_context_menu (ThunarShortcutsView *view,
       /* append the "Mount" item */
       item = gtk_image_menu_item_new_with_mnemonic (_("_Mount"));
       gtk_widget_set_sensitive (item, !thunar_g_volume_is_mounted (volume));
+      g_signal_connect_swapped (item, "activate",
+                                G_CALLBACK (thunar_shortcuts_view_row_mount),
+                                view);
       gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
       gtk_widget_show (item);
 
@@ -761,6 +766,9 @@ thunar_shortcuts_view_row_context_menu (ThunarShortcutsView *view,
           /* append the "Unmount" item */
           item = gtk_image_menu_item_new_with_mnemonic (_("_Unmount"));
           gtk_widget_set_sensitive (item, thunar_g_volume_is_mounted (volume));
+          g_signal_connect_swapped (item, "activate",
+                                    G_CALLBACK (thunar_shortcuts_view_row_unmount),
+                                    view);
           gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
           gtk_widget_show (item);
         }
@@ -768,6 +776,9 @@ thunar_shortcuts_view_row_context_menu (ThunarShortcutsView *view,
       /* append the "Disconnect" (eject + safely remove drive) item */
       item = gtk_image_menu_item_new_with_mnemonic (_("Disconn_ect"));
       gtk_widget_set_sensitive (item, thunar_g_volume_is_mounted (volume));
+      g_signal_connect_swapped (item, "activate",
+                                G_CALLBACK (thunar_shortcuts_view_row_disconnect),
+                                view);
       gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
       gtk_widget_show (item);
     }
@@ -902,7 +913,7 @@ thunar_shortcuts_view_row_open_new_window (ThunarShortcutsView *view)
 
 
 static void
-thunar_shortcuts_view_row_disconnect_mount (ThunarShortcutsView *view)
+thunar_shortcuts_view_row_disconnect (ThunarShortcutsView *view)
 {
   ThunarShortcutRow *row;
 
@@ -911,7 +922,37 @@ thunar_shortcuts_view_row_disconnect_mount (ThunarShortcutsView *view)
   row = thunar_shortcuts_view_get_selected_row (view);
 
   if (row != NULL)
-    thunar_shortcut_row_disconnect_mount (row);
+    thunar_shortcut_row_disconnect (row);
+}
+
+
+
+static void
+thunar_shortcuts_view_row_mount (ThunarShortcutsView *view)
+{
+  ThunarShortcutRow *row;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
+
+  row = thunar_shortcuts_view_get_selected_row (view);
+
+  if (row != NULL)
+    thunar_shortcut_row_mount (row);
+}
+
+
+
+static void
+thunar_shortcuts_view_row_unmount (ThunarShortcutsView *view)
+{
+  ThunarShortcutRow *row;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
+
+  row = thunar_shortcuts_view_get_selected_row (view);
+
+  if (row != NULL)
+    thunar_shortcut_row_unmount (row);
 }
 
 

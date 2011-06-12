@@ -873,10 +873,6 @@ static void
 thunar_shortcut_row_button_clicked (ThunarShortcutRow *row,
                                     GtkButton         *button)
 {
-  GMountOperation *mount_operation;
-  GtkWidget       *toplevel;
-  GMount          *mount;
-
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
 
   /* check if we are currently mounting/ejecting something */
@@ -889,109 +885,8 @@ thunar_shortcut_row_button_clicked (ThunarShortcutRow *row,
       return;
     }
 
-  /* create a mount operation */
-  toplevel = gtk_widget_get_toplevel (GTK_WIDGET (row));
-  mount_operation = gtk_mount_operation_new (GTK_WINDOW (toplevel));
-  gtk_mount_operation_set_screen (GTK_MOUNT_OPERATION (mount_operation),
-                                  gtk_widget_get_screen (GTK_WIDGET (row)));
-
-  if (row->shortcut_type == THUNAR_SHORTCUT_STANDALONE_MOUNT)
-    {
-      /* if this fails there is something out of sync with the model */
-      g_assert (row->mount != NULL);
-
-      if (g_mount_can_unmount (row->mount))
-        {
-          /* start spinning */
-          thunar_shortcut_row_set_spinning (row, TRUE, THUNAR_SHORTCUT_ROW_EJECTING);
-
-          /* try unmounting the mount */
-          g_mount_unmount_with_operation (row->mount,
-                                          G_MOUNT_UNMOUNT_NONE,
-                                          mount_operation,
-                                          row->cancellable,
-                                          thunar_shortcut_row_mount_unmount_finish,
-                                          row);
-        }
-      else if (g_mount_can_eject (row->mount))
-        {
-          g_debug ("need to eject the mount");
-
-          /* start spinning */
-          thunar_shortcut_row_set_spinning (row, TRUE, THUNAR_SHORTCUT_ROW_EJECTING);
-
-          /* try ejecting the mount */
-          g_mount_eject_with_operation (row->mount,
-                                        G_MOUNT_UNMOUNT_NONE,
-                                        mount_operation,
-                                        row->cancellable,
-                                        thunar_shortcut_row_mount_eject_finish,
-                                        row);
-        }
-      else
-        {
-          /* something is out of sync... */
-        }
-    }
-  else if (row->shortcut_type == THUNAR_SHORTCUT_REGULAR_VOLUME
-           || row->shortcut_type == THUNAR_SHORTCUT_EJECTABLE_VOLUME)
-    {
-      /* if this fails there is something out of sync with the model */
-      g_assert (row->volume != NULL);
-
-      /* check if the volume is mounted */
-      mount = g_volume_get_mount (row->volume);
-      if (mount != NULL)
-        {
-          g_debug ("have mount");
-
-          /* check if we can unmount the mount */
-          if (g_mount_can_unmount (mount))
-            {
-              g_debug ("  trying to unmount the mount");
-
-              /* start spinning */
-              thunar_shortcut_row_set_spinning (row, TRUE, THUNAR_SHORTCUT_ROW_EJECTING);
-
-              /* try unmounting the mount */
-              g_mount_unmount_with_operation (mount,
-                                              G_MOUNT_UNMOUNT_NONE,
-                                              mount_operation,
-                                              row->cancellable,
-                                              thunar_shortcut_row_mount_unmount_finish,
-                                              row);
-            }
-          else if (g_mount_can_eject (mount))
-            {
-              g_debug ("  trying to eject the mount");
-
-              /* start spinning */
-              thunar_shortcut_row_set_spinning (row, TRUE, THUNAR_SHORTCUT_ROW_EJECTING);
-
-              /* try ejecting the mount */
-              g_mount_eject_with_operation (mount,
-                                            G_MOUNT_UNMOUNT_NONE,
-                                            mount_operation,
-                                            row->cancellable,
-                                            thunar_shortcut_row_mount_eject_finish,
-                                            row);
-            }
-
-          g_object_unref (mount);
-        }
-      else if (g_volume_can_eject (row->volume))
-        {
-          /* TODO try ejecting the volume */
-          g_debug ("trying to eject the volume");
-        }
-      else
-        {
-          /* something is out of sync... */
-        }
-    }
-
-  /* release the mount operation */
-  g_object_unref (mount_operation);
+  /* disconnect the shortcut */
+  thunar_shortcut_row_disconnect (row);
 }
 
 
@@ -1121,6 +1016,14 @@ thunar_shortcut_row_resolve_and_activate (ThunarShortcutRow *row,
   GError     *error = NULL;
 
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
+
+  /* check if we are currently mounting/ejecting something */
+  if (row->state != THUNAR_SHORTCUT_ROW_NORMAL)
+    {
+      /* abort the current mount/eject process */
+      g_cancellable_cancel (row->cancellable);
+      g_cancellable_reset (row->cancellable);
+    }
 
   if (row->volume != NULL)
     {
@@ -1666,21 +1569,30 @@ thunar_shortcut_row_set_icon_size (ThunarShortcutRow *row,
 
 
 void
-thunar_shortcut_row_disconnect_mount (ThunarShortcutRow *row)
+thunar_shortcut_row_mount (ThunarShortcutRow *row)
+{
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
+
+  thunar_shortcut_row_resolve_and_activate (row, FALSE);
+}
+
+
+
+void
+thunar_shortcut_row_unmount (ThunarShortcutRow *row)
 {
   GMountOperation *mount_operation;
   GtkWidget       *toplevel;
+  GMount          *mount;
 
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
-  _thunar_return_if_fail (row->shortcut_type == THUNAR_SHORTCUT_STANDALONE_MOUNT);
 
-  if (row->shortcut_type != THUNAR_SHORTCUT_STANDALONE_MOUNT)
-    return;
-
-  if (row->mount == NULL)
+  /* check if we are currently mounting/ejecting something */
+  if (row->state != THUNAR_SHORTCUT_ROW_NORMAL)
     {
-      /* something is out of sync */
-      return;
+      /* abort the current mount/eject process */
+      g_cancellable_cancel (row->cancellable);
+      g_cancellable_reset (row->cancellable);
     }
 
   /* create a mount operation */
@@ -1689,36 +1601,171 @@ thunar_shortcut_row_disconnect_mount (ThunarShortcutRow *row)
   gtk_mount_operation_set_screen (GTK_MOUNT_OPERATION (mount_operation),
                                   gtk_widget_get_screen (GTK_WIDGET (row)));
 
-  /* distinguish between mountable and ejectable mounts */
-  if (g_mount_can_unmount (row->mount))
+  if (row->mount != NULL)
     {
-      /* start spinning */
-      thunar_shortcut_row_set_spinning (row, TRUE, THUNAR_SHORTCUT_ROW_EJECTING);
+      /* only handle mounts that can be unmounted here */
+      if (g_mount_can_unmount (row->mount))
+        {
+          /* start spinning */
+          thunar_shortcut_row_set_spinning (row, TRUE, THUNAR_SHORTCUT_ROW_EJECTING);
 
-      /* try unmounting the mount */
-      g_mount_unmount_with_operation (row->mount,
-                                      G_MOUNT_UNMOUNT_NONE,
-                                      mount_operation,
-                                      row->cancellable,
-                                      thunar_shortcut_row_mount_unmount_finish,
-                                      row);
+          /* try unmounting the mount */
+          g_mount_unmount_with_operation (row->mount,
+                                          G_MOUNT_UNMOUNT_NONE,
+                                          mount_operation,
+                                          row->cancellable,
+                                          thunar_shortcut_row_mount_unmount_finish,
+                                          row);
+        }
     }
-  else if (g_mount_can_eject (row->mount))
+  else if (row->volume != NULL)
     {
-      /* start spinning */
-      thunar_shortcut_row_set_spinning (row, TRUE, THUNAR_SHORTCUT_ROW_EJECTING);
+      mount = g_volume_get_mount (row->volume);
+      if (mount != NULL)
+        {
+          g_debug ("have mount");
+          /* only handle mounts that can be unmounted here */
+          if (g_mount_can_unmount(mount))
+            {
+              g_debug ("can unmount");
+              /* start spinning */
+              thunar_shortcut_row_set_spinning (row, TRUE, 
+                                                THUNAR_SHORTCUT_ROW_EJECTING);
 
-      /* try ejecting the mount */
-      g_mount_eject_with_operation (row->mount,
-                                    G_MOUNT_UNMOUNT_NONE,
-                                    mount_operation,
-                                    row->cancellable,
-                                    thunar_shortcut_row_mount_eject_finish,
-                                    row);
+              /* try unmounting the mount */
+              g_mount_unmount_with_operation (mount,
+                                              G_MOUNT_UNMOUNT_NONE,
+                                              mount_operation,
+                                              row->cancellable,
+                                              thunar_shortcut_row_mount_unmount_finish,
+                                              row);
+            }
+
+          /* release the mount */
+          g_object_unref (mount);
+        }
+      
     }
   else
     {
-      /* something is out of sync... */
+      /* this method was called despite no mount or volume being available
+       * for this shortcut... that should not happen */
+    }
+
+  /* release the mount operation */
+  g_object_unref (mount_operation);
+}
+
+
+
+void
+thunar_shortcut_row_disconnect (ThunarShortcutRow *row)
+{
+  GMountOperation *mount_operation;
+  GtkWidget       *toplevel;
+  GMount          *mount;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
+
+  /* check if we are currently mounting/ejecting something */
+  if (row->state != THUNAR_SHORTCUT_ROW_NORMAL)
+    {
+      /* abort the current mount/eject process */
+      g_cancellable_cancel (row->cancellable);
+      g_cancellable_reset (row->cancellable);
+    }
+
+  /* create a mount operation */
+  toplevel = gtk_widget_get_toplevel (GTK_WIDGET (row));
+  mount_operation = gtk_mount_operation_new (GTK_WINDOW (toplevel));
+  gtk_mount_operation_set_screen (GTK_MOUNT_OPERATION (mount_operation),
+                                  gtk_widget_get_screen (GTK_WIDGET (row)));
+
+  if (row->mount != NULL)
+    {
+      /* distinguish between ejectable and unmountable mounts */
+      if (g_mount_can_eject (row->mount))
+        {
+          /* start spinning */
+          thunar_shortcut_row_set_spinning (row, TRUE, THUNAR_SHORTCUT_ROW_EJECTING);
+
+          /* try ejecting the mount */
+          g_mount_eject_with_operation (row->mount,
+                                        G_MOUNT_UNMOUNT_NONE,
+                                        mount_operation,
+                                        row->cancellable,
+                                        thunar_shortcut_row_mount_eject_finish,
+                                        row);
+        }
+      else if (g_mount_can_unmount (row->mount))
+        {
+          /* start spinning */
+          thunar_shortcut_row_set_spinning (row, TRUE, THUNAR_SHORTCUT_ROW_EJECTING);
+
+          /* try unmounting the mount */
+          g_mount_unmount_with_operation (row->mount,
+                                          G_MOUNT_UNMOUNT_NONE,
+                                          mount_operation,
+                                          row->cancellable,
+                                          thunar_shortcut_row_mount_unmount_finish,
+                                          row);
+        }
+      else
+        {
+          /* something is out of sync... */
+        }
+    }
+  else if (row->volume != NULL)
+    {
+      if (g_volume_can_eject (row->volume))
+        {
+          /* try to eject the volume */
+          g_debug ("trying to eject the volume");
+        }
+      else
+        {
+          mount = g_volume_get_mount (row->volume);
+          if (mount != NULL)
+            {
+              /* distinguish between ejectable and unmountable mounts */
+              if (g_mount_can_eject (mount))
+                {
+                  /* start spinning */
+                  thunar_shortcut_row_set_spinning (row, TRUE, 
+                                                    THUNAR_SHORTCUT_ROW_EJECTING);
+
+                  /* try unmounting the mount */
+                  g_mount_unmount_with_operation (mount,
+                                                  G_MOUNT_UNMOUNT_NONE,
+                                                  mount_operation,
+                                                  row->cancellable,
+                                                  thunar_shortcut_row_mount_unmount_finish,
+                                                  row);
+                }
+              else if (g_mount_can_unmount (mount))
+                {
+                  /* start spinning */
+                  thunar_shortcut_row_set_spinning (row, TRUE, 
+                                                    THUNAR_SHORTCUT_ROW_EJECTING);
+
+                  /* try unmounting the mount */
+                  g_mount_unmount_with_operation (mount,
+                                                  G_MOUNT_UNMOUNT_NONE,
+                                                  mount_operation,
+                                                  row->cancellable,
+                                                  thunar_shortcut_row_mount_unmount_finish,
+                                                  row);
+                }
+
+              /* release the mount */
+              g_object_unref (mount);
+            }
+        }
+    }
+  else
+    {
+      /* this method was called despite no mount or volume being available
+       * for this shortcut... that should not happen */
     }
 
   /* release the mount operation */
