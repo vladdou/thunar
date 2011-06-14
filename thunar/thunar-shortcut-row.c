@@ -123,6 +123,9 @@ static void     thunar_shortcut_row_mount_unmount_finish  (GObject              
 static void     thunar_shortcut_row_mount_eject_finish    (GObject               *object,
                                                            GAsyncResult          *result,
                                                            gpointer               user_data);
+static void     thunar_shortcut_row_volume_eject_finish   (GObject               *object,
+                                                           GAsyncResult          *result,
+                                                           gpointer               user_data);
 static void     thunar_shortcut_row_poke_volume_finish    (ThunarBrowser         *browser,
                                                            GVolume               *volume,
                                                            ThunarFile            *file,
@@ -946,6 +949,33 @@ thunar_shortcut_row_mount_eject_finish (GObject      *object,
 
 
 static void
+thunar_shortcut_row_volume_eject_finish (GObject      *object,
+                                         GAsyncResult *result,
+                                         gpointer      user_data)
+{
+  ThunarShortcutRow *row = THUNAR_SHORTCUT_ROW (user_data);
+  GVolume           *volume = G_VOLUME (object);
+  GError            *error = NULL;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
+  _thunar_return_if_fail (G_IS_VOLUME (volume));
+  _thunar_return_if_fail (G_IS_ASYNC_RESULT (result));
+
+  if (!g_volume_eject_with_operation_finish (volume, result, &error))
+    {
+      thunar_dialogs_show_error (GTK_WIDGET (row), error,
+                                 _("Failed to eject \"%s\""),
+                                 row->label);
+      g_error_free (error);
+    }
+
+  /* stop spinning */
+  thunar_shortcut_row_set_spinning (row, FALSE, THUNAR_SHORTCUT_ROW_NORMAL);
+}
+
+
+
+static void
 thunar_shortcut_row_poke_volume_finish (ThunarBrowser *browser,
                                         GVolume       *volume,
                                         ThunarFile    *file,
@@ -1697,30 +1727,21 @@ thunar_shortcut_row_disconnect (ThunarShortcutRow *row)
                                         thunar_shortcut_row_mount_eject_finish,
                                         row);
         }
-      else if (g_mount_can_unmount (row->mount))
-        {
-          /* start spinning */
-          thunar_shortcut_row_set_spinning (row, TRUE, THUNAR_SHORTCUT_ROW_EJECTING);
-
-          /* try unmounting the mount */
-          g_mount_unmount_with_operation (row->mount,
-                                          G_MOUNT_UNMOUNT_NONE,
-                                          mount_operation,
-                                          row->cancellable,
-                                          thunar_shortcut_row_mount_unmount_finish,
-                                          row);
-        }
-      else
-        {
-          /* something is out of sync... */
-        }
     }
   else if (row->volume != NULL)
     {
       if (g_volume_can_eject (row->volume))
         {
-          /* try to eject the volume */
-          g_debug ("trying to eject the volume");
+          /* start spinning */
+          thunar_shortcut_row_set_spinning (row, TRUE, THUNAR_SHORTCUT_ROW_EJECTING);
+
+          /* try ejecting the volume */
+          g_volume_eject_with_operation (row->volume,
+                                         G_MOUNT_UNMOUNT_NONE,
+                                         mount_operation,
+                                         row->cancellable,
+                                         thunar_shortcut_row_volume_eject_finish,
+                                         row);
         }
       else
         {

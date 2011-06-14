@@ -688,6 +688,7 @@ thunar_shortcuts_view_row_context_menu (ThunarShortcutsView *view,
   GtkWidget         *menu;
   GtkWidget         *window;
   GVolume           *volume;
+  GMount            *mount;
   GList             *lp;
   GList             *providers;
   GList             *actions = NULL;
@@ -748,13 +749,13 @@ thunar_shortcuts_view_row_context_menu (ThunarShortcutsView *view,
   if (shortcut_type == THUNAR_SHORTCUT_REGULAR_VOLUME
       || shortcut_type == THUNAR_SHORTCUT_EJECTABLE_VOLUME)
     {
-      /* get the volume from the shortcut row */
+      /* get the volume and mount from the shortcut row */
       volume = thunar_shortcut_row_get_volume (row);
+      mount = g_volume_get_mount (volume);
       
-      /* check if we have a mounted volume */
       /* append the "Mount" item */
       item = gtk_image_menu_item_new_with_mnemonic (_("_Mount"));
-      gtk_widget_set_sensitive (item, !thunar_g_volume_is_mounted (volume));
+      gtk_widget_set_sensitive (item, mount == NULL && g_volume_can_mount (volume));
       g_signal_connect_swapped (item, "activate",
                                 G_CALLBACK (thunar_shortcuts_view_row_mount),
                                 view);
@@ -765,7 +766,7 @@ thunar_shortcuts_view_row_context_menu (ThunarShortcutsView *view,
         {
           /* append the "Unmount" item */
           item = gtk_image_menu_item_new_with_mnemonic (_("_Unmount"));
-          gtk_widget_set_sensitive (item, thunar_g_volume_is_mounted (volume));
+          gtk_widget_set_sensitive (item, mount != NULL && g_mount_can_unmount (mount));
           g_signal_connect_swapped (item, "activate",
                                     G_CALLBACK (thunar_shortcuts_view_row_unmount),
                                     view);
@@ -775,12 +776,17 @@ thunar_shortcuts_view_row_context_menu (ThunarShortcutsView *view,
 
       /* append the "Disconnect" (eject + safely remove drive) item */
       item = gtk_image_menu_item_new_with_mnemonic (_("Disconn_ect"));
-      gtk_widget_set_sensitive (item, thunar_g_volume_is_mounted (volume));
+      gtk_widget_set_sensitive (item, 
+                                (mount != NULL && g_mount_can_eject (mount))
+                                || g_volume_can_eject (volume));
       g_signal_connect_swapped (item, "activate",
                                 G_CALLBACK (thunar_shortcuts_view_row_disconnect),
                                 view);
       gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
       gtk_widget_show (item);
+
+      if (mount != NULL)
+        g_object_unref (mount);
     }
 
   /* get the ThunarFile from the row */
