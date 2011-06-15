@@ -49,6 +49,7 @@
 
 
 #define THUNAR_SHORTCUTS_VIEW_FLASH_TIMEOUT 150
+#define THUNAR_SHORTCUTS_VIEW_FLASH_TIMES     4
 
 
 
@@ -686,8 +687,8 @@ thunar_shortcuts_view_flash_expander (gpointer user_data)
   /* increment the flash counter */
   flash_count += 1;
 
-  /* abort if we have flashed 4 times */
-  if (flash_count >= 8)
+  /* abort if we have flashed several times */
+  if (flash_count >= (THUNAR_SHORTCUTS_VIEW_FLASH_TIMES * 2))
     {
       /* reset the event box color */
       gtk_widget_set_state (GTK_WIDGET (event_box), GTK_STATE_NORMAL);
