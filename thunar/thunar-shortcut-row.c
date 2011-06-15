@@ -1617,6 +1617,8 @@ thunar_shortcut_row_unmount (ThunarShortcutRow *row)
 
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
 
+  g_debug ("row unmount");
+
   /* check if we are currently mounting/ejecting something */
   if (row->state != THUNAR_SHORTCUT_ROW_NORMAL)
     {
@@ -1633,11 +1635,17 @@ thunar_shortcut_row_unmount (ThunarShortcutRow *row)
 
   if (row->mount != NULL)
     {
+      g_debug ("  have mount");
+
       /* only handle mounts that can be unmounted here */
       if (g_mount_can_unmount (row->mount))
         {
+          g_debug ("  mount can unmount");
+
           /* start spinning */
           thunar_shortcut_row_set_spinning (row, TRUE, THUNAR_SHORTCUT_ROW_EJECTING);
+
+          g_debug ("  unmount now");
 
           /* try unmounting the mount */
           g_mount_unmount_with_operation (row->mount,
@@ -1650,17 +1658,22 @@ thunar_shortcut_row_unmount (ThunarShortcutRow *row)
     }
   else if (row->volume != NULL)
     {
+      g_debug ("  have volume");
       mount = g_volume_get_mount (row->volume);
       if (mount != NULL)
         {
-          g_debug ("have mount");
+          g_debug ("  have mount");
+
           /* only handle mounts that can be unmounted here */
           if (g_mount_can_unmount(mount))
             {
-              g_debug ("can unmount");
+              g_debug ("  can unmount");
+
               /* start spinning */
               thunar_shortcut_row_set_spinning (row, TRUE, 
                                                 THUNAR_SHORTCUT_ROW_EJECTING);
+
+              g_debug ("  unmount now");
 
               /* try unmounting the mount */
               g_mount_unmount_with_operation (mount,
@@ -1697,6 +1710,8 @@ thunar_shortcut_row_disconnect (ThunarShortcutRow *row)
 
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
 
+  g_debug ("disconnect row");
+
   /* check if we are currently mounting/ejecting something */
   if (row->state != THUNAR_SHORTCUT_ROW_NORMAL)
     {
@@ -1713,11 +1728,17 @@ thunar_shortcut_row_disconnect (ThunarShortcutRow *row)
 
   if (row->mount != NULL)
     {
+      g_debug ("  have mount");
+
       /* distinguish between ejectable and unmountable mounts */
       if (g_mount_can_eject (row->mount))
         {
+          g_debug ("  can eject");
+
           /* start spinning */
           thunar_shortcut_row_set_spinning (row, TRUE, THUNAR_SHORTCUT_ROW_EJECTING);
+
+          g_debug ("  eject now");
 
           /* try ejecting the mount */
           g_mount_eject_with_operation (row->mount,
@@ -1726,6 +1747,20 @@ thunar_shortcut_row_disconnect (ThunarShortcutRow *row)
                                         row->cancellable,
                                         thunar_shortcut_row_mount_eject_finish,
                                         row);
+        }
+      else if (g_mount_can_unmount (row->mount))
+        {
+          /* start spinning */
+          thunar_shortcut_row_set_spinning (row, TRUE, 
+                                            THUNAR_SHORTCUT_ROW_EJECTING);
+
+          /* try unmounting the mount */
+          g_mount_unmount_with_operation (row->mount,
+                                          G_MOUNT_UNMOUNT_NONE,
+                                          mount_operation,
+                                          row->cancellable,
+                                          thunar_shortcut_row_mount_unmount_finish,
+                                          row);
         }
     }
   else if (row->volume != NULL)
