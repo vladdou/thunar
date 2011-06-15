@@ -48,6 +48,10 @@
 
 
 
+#define THUNAR_SHORTCUTS_VIEW_FLASH_TIMEOUT 150
+
+
+
 /* identifiers for properties */
 enum
 {
@@ -95,6 +99,7 @@ static void               thunar_shortcuts_view_row_changed              (Thunar
                                                                           GtkTreePath                      *path,
                                                                           GtkTreeIter                      *iter,
                                                                           GtkTreeModel                     *model);
+static gboolean           thunar_shortcuts_view_flash_expander           (gpointer                          user_data);
 static GtkWidget *        thunar_shortcuts_view_get_expander_at          (ThunarShortcutsView              *view,
                                                                           gint                              index);
 static void               thunar_shortcuts_view_row_activated            (ThunarShortcutsView              *view,
@@ -150,7 +155,9 @@ struct _ThunarShortcutsView
 
 
 
-static guint view_signals[LAST_SIGNAL];
+static GQuark thunar_shortcuts_view_idle_quark;
+static GQuark thunar_shortcuts_view_counter_quark;
+static guint  view_signals[LAST_SIGNAL];
 
 
 
@@ -163,6 +170,11 @@ static void
 thunar_shortcuts_view_class_init (ThunarShortcutsViewClass *klass)
 {
   GObjectClass   *gobject_class;
+
+  thunar_shortcuts_view_idle_quark = 
+    g_quark_from_static_string ("thunar-shortcuts-view-idle");
+  thunar_shortcuts_view_counter_quark =
+    g_quark_from_static_string ("thunar-shortcuts-view-counter");
 
   gobject_class = G_OBJECT_CLASS (klass);
   gobject_class->constructed = thunar_shortcuts_view_constructed;
@@ -286,6 +298,11 @@ thunar_shortcuts_view_constructed (GObject *object)
 
       if (category)
         {
+          /* create an event box for the expander */
+          box = gtk_event_box_new ();
+          gtk_box_pack_start (GTK_BOX (view->expander_box), box, FALSE, TRUE, 0);
+          gtk_widget_show (box);
+
           /* create the category expander */
           expander = gtk_expander_new (NULL);
           markup = g_markup_printf_escaped (markup_format, name);
@@ -296,8 +313,8 @@ thunar_shortcuts_view_constructed (GObject *object)
           gtk_container_set_border_width (GTK_CONTAINER (expander), 0);
           gtk_expander_set_spacing (GTK_EXPANDER (expander), 0);
 
-          /* add it to the expander box and show it */
-          gtk_box_pack_start (GTK_BOX (view->expander_box), expander, FALSE, TRUE, 0);
+          /* add it to the expander event box and show it */
+          gtk_container_add (GTK_CONTAINER (box), expander);
           gtk_widget_show (expander);
 
           /* create a box for the shortcuts of the category */
@@ -421,6 +438,7 @@ thunar_shortcuts_view_row_inserted (ThunarShortcutsView *view,
   GIcon             *eject_icon;
   GIcon             *icon;
   gchar             *name;
+  guint              flash_idle;
   gint               category_index;
   gint               shortcut_index;
 
@@ -497,6 +515,32 @@ thunar_shortcuts_view_row_inserted (ThunarShortcutsView *view,
       g_signal_connect_swapped (shortcut_row, "context-menu",
                                 G_CALLBACK (thunar_shortcuts_view_row_context_menu),
                                 view);
+
+      /* flash the expander if it is collapsed */
+      if (!gtk_expander_get_expanded (GTK_EXPANDER (expander)))
+        {
+          /* abort active flash idle handlers */
+          flash_idle = 
+            GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (expander), 
+                                                  thunar_shortcuts_view_idle_quark));
+          if (flash_idle > 0)
+            g_source_remove (flash_idle);
+
+          /* reschedule the flash idle */
+          flash_idle = g_timeout_add (THUNAR_SHORTCUTS_VIEW_FLASH_TIMEOUT,
+                                      thunar_shortcuts_view_flash_expander,
+                                      expander);
+
+          /* remember the idle handler */
+          g_object_set_qdata (G_OBJECT (expander),
+                              thunar_shortcuts_view_idle_quark,
+                              GUINT_TO_POINTER (flash_idle));
+
+          /* reset the flash counter to 0 */
+          g_object_set_qdata (G_OBJECT (expander),
+                              thunar_shortcuts_view_counter_quark,
+                             GUINT_TO_POINTER (0));
+        }
     }
 }
 
@@ -516,7 +560,6 @@ thunar_shortcuts_view_row_deleted (ThunarShortcutsView *view,
 
   _thunar_return_if_fail (THUNAR_SHORTCUTS_VIEW (view));
   _thunar_return_if_fail (GTK_IS_TREE_MODEL (model));
-
 
   /* get the category and shortcut index */
   category_index = gtk_tree_path_get_indices (path)[0];
@@ -613,6 +656,69 @@ thunar_shortcuts_view_row_changed (ThunarShortcutsView *view,
 
 
 
+static gboolean
+thunar_shortcuts_view_flash_expander (gpointer user_data)
+{
+  GtkWidget *expander = GTK_WIDGET (user_data);
+  GtkWidget *event_box;
+  guint      flash_count;
+
+  /* check how many times we have flashed the expander already */
+  flash_count = 
+    GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (expander), 
+                                          thunar_shortcuts_view_counter_quark));
+
+  /* get the expander event box */
+  event_box = gtk_widget_get_parent (expander);
+
+  /* change the base and background color */
+  if ((flash_count % 2) == 0)
+    {
+      gtk_widget_set_state (GTK_WIDGET (event_box), GTK_STATE_PRELIGHT);
+      gtk_widget_queue_draw (event_box);
+    }
+  else
+    {
+      gtk_widget_set_state (GTK_WIDGET (event_box), GTK_STATE_NORMAL);
+      gtk_widget_queue_draw (event_box);
+    }
+
+  /* increment the flash counter */
+  flash_count += 1;
+
+  /* abort if we have flashed 4 times */
+  if (flash_count >= 8)
+    {
+      /* reset the event box color */
+      gtk_widget_set_state (GTK_WIDGET (event_box), GTK_STATE_NORMAL);
+      gtk_widget_queue_draw (event_box);
+
+      /* clear the flash counter */
+      g_object_set_qdata (G_OBJECT (expander),
+                          thunar_shortcuts_view_counter_quark,
+                          NULL);
+
+      /* clear the idle handler */
+      g_object_set_qdata (G_OBJECT (expander),
+                          thunar_shortcuts_view_idle_quark,
+                          NULL);
+
+      /* abort the timeout */
+      return FALSE;
+    }
+  else
+    {
+      /* update the flash counter */
+      g_object_set_qdata (G_OBJECT (expander),
+                          thunar_shortcuts_view_counter_quark,
+                          GUINT_TO_POINTER (flash_count));
+
+      return TRUE;
+    }
+}
+
+
+
 static GtkWidget *
 thunar_shortcuts_view_get_expander_at (ThunarShortcutsView *view,
                                        gint                 expander_index)
@@ -628,7 +734,7 @@ thunar_shortcuts_view_get_expander_at (ThunarShortcutsView *view,
 
   lp = g_list_nth (expanders, expander_index);
   if (lp != NULL)
-    expander = lp->data;
+    expander = gtk_bin_get_child (GTK_BIN (lp->data));
 
   g_list_free (expanders);
 
@@ -1001,7 +1107,8 @@ thunar_shortcuts_view_foreach_row (ThunarShortcutsView              *view,
                                    gpointer                          user_data)
 {
   GtkWidget *box;
-  GList     *expanders;
+  GtkWidget *expander;
+  GList     *expander_boxes;
   GList     *ep;
   GList     *rows;
   GList     *rp;
@@ -1010,13 +1117,16 @@ thunar_shortcuts_view_foreach_row (ThunarShortcutsView              *view,
   _thunar_return_if_fail (func != NULL);
 
   /* get a list of all expanders */
-  expanders = gtk_container_get_children (GTK_CONTAINER (view->expander_box));
+  expander_boxes = gtk_container_get_children (GTK_CONTAINER (view->expander_box));
 
-  /* iterate over all expanders */
-  for (ep = expanders; ep != NULL; ep = ep->next)
+  /* iterate over all expander event boxes */
+  for (ep = expander_boxes; ep != NULL; ep = ep->next)
     {
+      /* get the expander */
+      expander = gtk_bin_get_child (GTK_BIN (ep->data));
+
       /* get the box that holds the rows */
-      box = gtk_bin_get_child (GTK_BIN (ep->data));
+      box = gtk_bin_get_child (GTK_BIN (expander));
 
       /* get a list of all rows in the box */
       rows = gtk_container_get_children (GTK_CONTAINER (box));
@@ -1033,7 +1143,7 @@ thunar_shortcuts_view_foreach_row (ThunarShortcutsView              *view,
     }
 
   /* free the list of expanders */
-  g_list_free (expanders);
+  g_list_free (expander_boxes);
 }
 
 
