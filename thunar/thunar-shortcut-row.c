@@ -136,6 +136,12 @@ static void     thunar_shortcut_row_poke_file_finish      (ThunarBrowser        
                                                            ThunarFile            *target_file,
                                                            GError                *error,
                                                            gpointer               user_data);
+static void     thunar_shortcut_row_poke_location_finish  (ThunarBrowser         *browser,
+                                                           GFile                 *location,
+                                                           ThunarFile            *file,
+                                                           ThunarFile            *target_file,
+                                                           GError                *error,
+                                                           gpointer               user_data);
 static void     thunar_shortcut_row_icon_changed          (ThunarShortcutRow     *row);
 static void     thunar_shortcut_row_label_changed         (ThunarShortcutRow     *row);
 static void     thunar_shortcut_row_location_changed      (ThunarShortcutRow     *row);
@@ -907,6 +913,9 @@ thunar_shortcut_row_mount_unmount_finish (GObject      *object,
   _thunar_return_if_fail (G_IS_MOUNT (mount));
   _thunar_return_if_fail (G_IS_ASYNC_RESULT (result));
 
+  /* stop spinning */
+  thunar_shortcut_row_set_spinning (row, FALSE, THUNAR_SHORTCUT_ROW_NORMAL);
+
   if (!g_mount_unmount_with_operation_finish (mount, result, &error))
     {
       thunar_dialogs_show_error (GTK_WIDGET (row), error,
@@ -914,9 +923,6 @@ thunar_shortcut_row_mount_unmount_finish (GObject      *object,
                                  row->label);
       g_error_free (error);
     }
-
-  /* stop spinning */
-  thunar_shortcut_row_set_spinning (row, FALSE, THUNAR_SHORTCUT_ROW_NORMAL);
 }
 
 
@@ -930,6 +936,9 @@ thunar_shortcut_row_mount_eject_finish (GObject      *object,
   GMount            *mount = G_MOUNT (object);
   GError            *error = NULL;
 
+  /* stop spinning */
+  thunar_shortcut_row_set_spinning (row, FALSE, THUNAR_SHORTCUT_ROW_NORMAL);
+
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
   _thunar_return_if_fail (G_IS_MOUNT (mount));
   _thunar_return_if_fail (G_IS_ASYNC_RESULT (result));
@@ -941,9 +950,6 @@ thunar_shortcut_row_mount_eject_finish (GObject      *object,
                                  row->label);
       g_error_free (error);
     }
-
-  /* stop spinning */
-  thunar_shortcut_row_set_spinning (row, FALSE, THUNAR_SHORTCUT_ROW_NORMAL);
 }
 
 
@@ -961,6 +967,9 @@ thunar_shortcut_row_volume_eject_finish (GObject      *object,
   _thunar_return_if_fail (G_IS_VOLUME (volume));
   _thunar_return_if_fail (G_IS_ASYNC_RESULT (result));
 
+  /* stop spinning */
+  thunar_shortcut_row_set_spinning (row, FALSE, THUNAR_SHORTCUT_ROW_NORMAL);
+
   if (!g_volume_eject_with_operation_finish (volume, result, &error))
     {
       thunar_dialogs_show_error (GTK_WIDGET (row), error,
@@ -968,9 +977,6 @@ thunar_shortcut_row_volume_eject_finish (GObject      *object,
                                  row->label);
       g_error_free (error);
     }
-
-  /* stop spinning */
-  thunar_shortcut_row_set_spinning (row, FALSE, THUNAR_SHORTCUT_ROW_NORMAL);
 }
 
 
@@ -989,6 +995,9 @@ thunar_shortcut_row_poke_volume_finish (ThunarBrowser *browser,
   _thunar_return_if_fail (G_IS_VOLUME (volume));
   _thunar_return_if_fail (file == NULL || THUNAR_IS_FILE (file));
 
+  /* deactivate the spinner */
+  thunar_shortcut_row_set_spinning (row, FALSE, THUNAR_SHORTCUT_ROW_NORMAL);
+
   if (error == NULL)
     {
       g_signal_emit (row, row_signals[SIGNAL_ACTIVATED], 0, file, open_in_new_window);
@@ -999,9 +1008,6 @@ thunar_shortcut_row_poke_volume_finish (ThunarBrowser *browser,
                                  _("Failed to open \"%s\""),
                                  row->label);
     }
-
-  /* deactivate the spinner */
-  thunar_shortcut_row_set_spinning (row, FALSE, THUNAR_SHORTCUT_ROW_NORMAL);
 }
 
 
@@ -1020,6 +1026,9 @@ thunar_shortcut_row_poke_file_finish (ThunarBrowser *browser,
   _thunar_return_if_fail (THUNAR_IS_FILE (file));
   _thunar_return_if_fail (target_file == NULL || THUNAR_IS_FILE (target_file));
 
+  /* deactivate the spinner */
+  thunar_shortcut_row_set_spinning (row, FALSE, THUNAR_SHORTCUT_ROW_NORMAL);
+
   if (error == NULL)
     {
       g_signal_emit (row, row_signals[SIGNAL_ACTIVATED], 0, target_file, 
@@ -1031,9 +1040,40 @@ thunar_shortcut_row_poke_file_finish (ThunarBrowser *browser,
                                  _("Failed to open \"%s\""),
                                  row->label);
     }
+}
+
+
+
+static void
+thunar_shortcut_row_poke_location_finish (ThunarBrowser *browser,
+                                          GFile         *location,
+                                          ThunarFile    *file,
+                                          ThunarFile    *target_file,
+                                          GError        *error,
+                                          gpointer       user_data)
+{
+  ThunarShortcutRow *row = THUNAR_SHORTCUT_ROW (browser);
+  gboolean           open_in_new_window = GPOINTER_TO_UINT (user_data);
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (browser));
+  _thunar_return_if_fail (G_IS_FILE (location));
+  _thunar_return_if_fail (file == NULL || THUNAR_IS_FILE (file));
+  _thunar_return_if_fail (target_file == NULL || THUNAR_IS_FILE (target_file));
 
   /* deactivate the spinner */
   thunar_shortcut_row_set_spinning (row, FALSE, THUNAR_SHORTCUT_ROW_NORMAL);
+
+  if (error == NULL)
+    {
+      g_signal_emit (row, row_signals[SIGNAL_ACTIVATED], 0, target_file, 
+                     open_in_new_window);
+    }
+  else
+    {
+      thunar_dialogs_show_error (GTK_WIDGET (row), error,
+                                 _("Failed to open \"%s\""),
+                                 row->label);
+    }
 }
 
 
@@ -1042,9 +1082,6 @@ void
 thunar_shortcut_row_resolve_and_activate (ThunarShortcutRow *row,
                                           gboolean           open_in_new_window)
 {
-  ThunarFile *file;
-  GError     *error = NULL;
-
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
 
   /* check if we are currently mounting/ejecting something */
@@ -1064,31 +1101,23 @@ thunar_shortcut_row_resolve_and_activate (ThunarShortcutRow *row,
                                   thunar_shortcut_row_poke_volume_finish,
                                   GUINT_TO_POINTER (open_in_new_window));
     }
+  else if (row->file != NULL)
+    {
+      /* activate the spinner */
+      thunar_shortcut_row_set_spinning (row, TRUE, THUNAR_SHORTCUT_ROW_RESOLVING);
+
+      thunar_browser_poke_file (THUNAR_BROWSER (row), row->file, row,
+                                thunar_shortcut_row_poke_file_finish,
+                                GUINT_TO_POINTER (open_in_new_window));
+    }
   else if (row->location != NULL)
     {
-      file = thunar_file_get (row->location, NULL);
-      if (file != NULL)
-        {
-          /* activate the spinner */
-          thunar_shortcut_row_set_spinning (row, TRUE, THUNAR_SHORTCUT_ROW_RESOLVING);
+      /* activate the spinner */
+      thunar_shortcut_row_set_spinning (row, TRUE, THUNAR_SHORTCUT_ROW_RESOLVING);
 
-          thunar_browser_poke_file (THUNAR_BROWSER (row), file, row,
-                                    thunar_shortcut_row_poke_file_finish,
+      thunar_browser_poke_location (THUNAR_BROWSER (row), row->location, row,
+                                    thunar_shortcut_row_poke_location_finish,
                                     GUINT_TO_POINTER (open_in_new_window));
-
-          g_object_unref (file);
-        }
-      else
-        {
-          g_set_error (&error, G_IO_ERROR, G_IO_ERROR_UNKNOWN,
-                       _("Folder could not be loaded"));
-
-          thunar_dialogs_show_error (GTK_WIDGET (row), error,
-                                     _("Failed to open \"%s\""),
-                                     row->label);
-
-          g_error_free (error);
-        }
     }
   else
     {

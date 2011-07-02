@@ -33,17 +33,24 @@ G_BEGIN_DECLS
 typedef struct _ThunarBrowser      ThunarBrowser;
 typedef struct _ThunarBrowserIface ThunarBrowserIface;
 
-typedef void (*ThunarBrowserPokeFileFunc)   (ThunarBrowser *browser,
-                                             ThunarFile    *file,
-                                             ThunarFile    *target_file,
-                                             GError        *error,
-                                             gpointer       user_data);
+typedef void (*ThunarBrowserPokeFileFunc)     (ThunarBrowser *browser,
+                                               ThunarFile    *file,
+                                               ThunarFile    *target_file,
+                                               GError        *error,
+                                               gpointer       user_data);
 
-typedef void (*ThunarBrowserPokeVolumeFunc) (ThunarBrowser *browser,
-                                             GVolume       *volume,
-                                             ThunarFile    *mount_point,
-                                             GError        *error,
-                                             gpointer       user_data);
+typedef void (*ThunarBrowserPokeVolumeFunc)   (ThunarBrowser *browser,
+                                               GVolume       *volume,
+                                               ThunarFile    *mount_point,
+                                               GError        *error,
+                                               gpointer       user_data);
+
+typedef void (*ThunarBrowserPokeLocationFunc) (ThunarBrowser *browser,
+                                               GFile         *location,
+                                               ThunarFile    *file,
+                                               ThunarFile    *target_file,
+                                               GError        *error,
+                                               gpointer       user_data);
 
 struct _ThunarBrowserIface
 {
@@ -54,18 +61,24 @@ struct _ThunarBrowserIface
   /* virtual methods */
 };
 
-GType thunar_browser_get_type    (void) G_GNUC_CONST;
+GType thunar_browser_get_type      (void) G_GNUC_CONST;
 
-void  thunar_browser_poke_file   (ThunarBrowser              *browser,
-                                  ThunarFile                 *file,
-                                  gpointer                    widget,
-                                  ThunarBrowserPokeFileFunc   func,
-                                  gpointer                    user_data);
-void  thunar_browser_poke_volume (ThunarBrowser              *browser,
-                                  GVolume                    *volume,
-                                  gpointer                    widget,
-                                  ThunarBrowserPokeVolumeFunc func,
-                                  gpointer                    user_data);
+void  thunar_browser_poke_file     (ThunarBrowser                *browser,
+                                    ThunarFile                   *file,
+                                    gpointer                      widget,
+                                    ThunarBrowserPokeFileFunc     func,
+                                    gpointer                      user_data);
+void  thunar_browser_poke_volume   (ThunarBrowser                *browser,
+                                    GVolume                      *volume,
+                                    gpointer                      widget,
+                                    ThunarBrowserPokeVolumeFunc   func,
+                                    gpointer                      user_data);
+
+void  thunar_browser_poke_location (ThunarBrowser                *browser,
+                                    GFile                        *location,
+                                    gpointer                      widget,
+                                    ThunarBrowserPokeLocationFunc func,
+                                    gpointer                      user_data);
 
 G_END_DECLS
 

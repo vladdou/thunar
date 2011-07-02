@@ -27,6 +27,7 @@
 
 #include <gio/gio.h>
 
+#include <thunar/thunar-browser.h>
 #include <thunar/thunar-enum-types.h>
 #include <thunar/thunar-file.h>
 #include <thunar/thunar-private.h>
@@ -61,21 +62,23 @@ enum
 
 
 
-static void thunar_shortcut_constructed      (GObject        *object);
-static void thunar_shortcut_finalize         (GObject        *object);
-static void thunar_shortcut_get_property     (GObject        *object,
-                                              guint           prop_id,
-                                              GValue         *value,
-                                              GParamSpec     *pspec);
-static void thunar_shortcut_set_property     (GObject        *object,
-                                              guint           prop_id,
-                                              const GValue   *value,
-                                              GParamSpec     *pspec);
-static void thunar_shortcut_load_file_finish (GFile          *location,
-                                              ThunarFile     *file,
-                                              GError         *error,
-                                              gpointer        user_data);
-static void thunar_shortcut_load_file        (ThunarShortcut *shortcut);
+static void thunar_shortcut_constructed          (GObject        *object);
+static void thunar_shortcut_finalize             (GObject        *object);
+static void thunar_shortcut_get_property         (GObject        *object,
+                                                  guint           prop_id,
+                                                  GValue         *value,
+                                                  GParamSpec     *pspec);
+static void thunar_shortcut_set_property         (GObject        *object,
+                                                  guint           prop_id,
+                                                  const GValue   *value,
+                                                  GParamSpec     *pspec);
+static void thunar_shortcut_poke_location_finish (ThunarBrowser  *browser,
+                                                  GFile          *location,
+                                                  ThunarFile     *file,
+                                                  ThunarFile     *target_file,
+                                                  GError         *error,
+                                                  gpointer        user_data);
+static void thunar_shortcut_load_file            (ThunarShortcut *shortcut);
 
 
 
@@ -112,7 +115,8 @@ struct _ThunarShortcut
 
 
 
-G_DEFINE_TYPE (ThunarShortcut, thunar_shortcut, G_TYPE_OBJECT)
+G_DEFINE_TYPE_WITH_CODE (ThunarShortcut, thunar_shortcut, G_TYPE_OBJECT,
+                         G_IMPLEMENT_INTERFACE (THUNAR_TYPE_BROWSER, NULL))
 
 
 
@@ -442,15 +446,18 @@ thunar_shortcut_set_property (GObject      *object,
 
 
 static void
-thunar_shortcut_load_file_finish (GFile      *location,
-                                  ThunarFile *file,
-                                  GError     *error,
-                                  gpointer    user_data)
+thunar_shortcut_poke_location_finish (ThunarBrowser *browser,
+                                      GFile         *location,
+                                      ThunarFile    *file,
+                                      ThunarFile    *target_file,
+                                      GError        *error,
+                                      gpointer       user_data)
 {
-  ThunarShortcut *shortcut = THUNAR_SHORTCUT (user_data);
+  ThunarShortcut *shortcut = THUNAR_SHORTCUT (browser);
 
   _thunar_return_if_fail (G_IS_FILE (location));
   _thunar_return_if_fail (file == NULL || THUNAR_IS_FILE (file));
+  _thunar_return_if_fail (target_file == NULL || THUNAR_IS_FILE (target_file));
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
   
   if (error != NULL)
@@ -460,7 +467,7 @@ thunar_shortcut_load_file_finish (GFile      *location,
   else
     {
       /* set the file and update the shortcut */
-      thunar_shortcut_set_file (shortcut, file);
+      thunar_shortcut_set_file (shortcut, target_file);
     }
 
   /* release the shortcut */
@@ -479,9 +486,11 @@ thunar_shortcut_load_file (ThunarShortcut *shortcut)
 
   /* load the ThunarFile asynchronously */
   /* TODO pass a cancellable here */
-  thunar_file_get_async (shortcut->location, NULL,
-                         thunar_shortcut_load_file_finish,
-                         g_object_ref (shortcut));
+  thunar_browser_poke_location (THUNAR_BROWSER (shortcut),
+                                shortcut->location,
+                                NULL,
+                                thunar_shortcut_poke_location_finish,
+                                g_object_ref (shortcut));
 }
 
 
