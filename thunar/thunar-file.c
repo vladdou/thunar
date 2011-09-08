@@ -833,14 +833,13 @@ thunar_file_finish_reload (ThunarFile   *file,
                            GCancellable *cancellable,
                            GError      **error)
 {
-  const gchar *target_uri;
-  GKeyFile    *key_file;
-  GFile       *thumbnail_dir;
-  gchar       *base_name;
-  gchar       *md5_hash;
-  gchar       *p;
-  gchar       *thumbnail_dir_path;
-  gchar       *uri = NULL;
+  GKeyFile *key_file;
+  GFile    *thumbnail_dir;
+  gchar    *base_name;
+  gchar    *md5_hash;
+  gchar    *p;
+  gchar    *thumbnail_dir_path;
+  gchar    *uri = NULL;
 
   _thunar_return_if_fail (THUNAR_IS_FILE (file));
   _thunar_return_if_fail (error != NULL);
