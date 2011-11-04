@@ -42,7 +42,8 @@
 #include <thunar/thunar-gtk-extensions.h>
 #include <thunar/thunar-preferences.h>
 #include <thunar/thunar-private.h>
-#include <thunar/thunar-shortcut-row.h>
+#include <thunar/thunar-shortcut-group.h>
+#include <thunar/thunar-shortcut.h>
 #include <thunar/thunar-shortcuts-model.h>
 #include <thunar/thunar-shortcuts-view.h>
 
@@ -73,9 +74,11 @@ enum
 
 
 
+#if 0
 typedef void (*ThunarShortcutsViewForeachRowFunc) (ThunarShortcutsView *view,
                                                    ThunarShortcutRow   *row,
                                                    gpointer             user_data);
+#endif
 
 
 
@@ -89,6 +92,23 @@ static void               thunar_shortcuts_view_set_property             (GObjec
                                                                           guint                             prop_id,
                                                                           const GValue                     *value,
                                                                           GParamSpec                       *pspec);
+static gboolean           thunar_shortcuts_view_load_system_shortcuts    (gpointer                          user_data);
+static void               thunar_shortcuts_view_create_home_shortcut     (ThunarShortcutsView              *view);
+static void               thunar_shortcuts_view_create_desktop_shortcut  (ThunarShortcutsView              *view);
+static void               thunar_shortcuts_view_create_trash_shortcut    (ThunarShortcutsView              *view);
+static void               thunar_shortcuts_view_create_network_shortcut  (ThunarShortcutsView              *view);
+static gboolean           thunar_shortcuts_view_load_user_dirs           (gpointer                          user_data);
+static gboolean           thunar_shortcuts_view_load_bookmarks           (gpointer                          user_data);
+static gboolean           thunar_shortcuts_view_load_volumes             (gpointer                          user_data);
+static void               thunar_shortcuts_view_volume_added             (ThunarShortcutsView              *view,
+                                                                          GVolume                          *volume,
+                                                                          GVolumeMonitor                   *monitor);
+static void               thunar_shortcuts_view_mount_added              (ThunarShortcutsView              *view,
+                                                                          GMount                           *mount,
+                                                                          GVolumeMonitor                   *monitor);
+static void               thunar_shortcuts_view_add_shortcut             (ThunarShortcutsView              *view,
+                                                                          ThunarShortcut                   *shortcut);
+#if 0
 static void               thunar_shortcuts_view_row_inserted             (ThunarShortcutsView              *view,
                                                                           GtkTreePath                      *path,
                                                                           GtkTreeIter                      *iter,
@@ -136,6 +156,7 @@ static void               thunar_shortcuts_view_unprelight_rows          (Thunar
 static void               thunar_shortcuts_view_update_selection_by_file (ThunarShortcutsView              *view,
                                                                           ThunarShortcutRow                *row,
                                                                           gpointer                          user_data);
+#endif
 
 
 
@@ -150,8 +171,10 @@ struct _ThunarShortcutsView
 
   ThunarxProviderFactory *provider_factory;
 
-  GtkTreeModel           *model;
-  GtkWidget              *expander_box;
+  GVolumeMonitor         *volume_monitor;
+  GtkWidget              *group_box;
+
+  guint                   load_idle_id;
 };
 
 
@@ -184,21 +207,7 @@ thunar_shortcuts_view_class_init (ThunarShortcutsViewClass *klass)
   gobject_class->set_property = thunar_shortcuts_view_set_property;
 
   /**
-   * ThunarShortcutsView:model:
-   *
-   * The #GtkTreeModel associated with this view.
-   **/
-  g_object_class_install_property (gobject_class,
-                                   PROP_MODEL,
-                                   g_param_spec_object ("model",
-                                                        "model",
-                                                        "model",
-                                                        GTK_TYPE_TREE_MODEL,
-                                                        EXO_PARAM_READWRITE |
-                                                        G_PARAM_CONSTRUCT));
-
-  /**
-   * ThunarShortcutsView:row-activated:
+   * ThunarShortcutsView:shortcut-activated:
    *
    * Invoked whenever a shortcut is activated by the user.
    **/
@@ -246,20 +255,44 @@ static void
 thunar_shortcuts_view_init (ThunarShortcutsView *view)
 {
   GtkWidget *alignment;
-
-  view->model = NULL;
+  GtkWidget *group;
 
   /* grab a reference on the provider factory */
   view->provider_factory = thunarx_provider_factory_get_default ();
 
+  /* add 4 pixels top and bottom padding around the contents of the shortcuts view */
   alignment = gtk_alignment_new (0.0f, 0.0f, 1.0f, 1.0f);
   gtk_alignment_set_padding (GTK_ALIGNMENT (alignment), 4, 4, 0, 0);
   gtk_container_add (GTK_CONTAINER (view), alignment);
   gtk_widget_show (alignment);
 
-  view->expander_box = gtk_vbox_new (FALSE, 10);
-  gtk_container_add (GTK_CONTAINER (alignment), view->expander_box);
-  gtk_widget_show (view->expander_box);
+  /* create a box to put the groups of shortcuts in */
+  view->group_box = gtk_vbox_new (FALSE, 10);
+  gtk_container_add (GTK_CONTAINER (alignment), view->group_box);
+  gtk_widget_show (view->group_box);
+
+  /* create the devices group */
+  group = thunar_shortcut_group_new (_("DEVICES"), 
+                                     THUNAR_SHORTCUT_REGULAR_VOLUME 
+                                     | THUNAR_SHORTCUT_EJECTABLE_VOLUME 
+                                     | THUNAR_SHORTCUT_REGULAR_MOUNT
+                                     | THUNAR_SHORTCUT_ARCHIVE_MOUNT);
+  gtk_box_pack_start (GTK_BOX (view->group_box), group, FALSE, TRUE, 0);
+  gtk_widget_show (group);
+
+  /* create the places group */
+  group = thunar_shortcut_group_new (_("PLACES"),
+                                     THUNAR_SHORTCUT_REGULAR_FILE
+                                     | THUNAR_SHORTCUT_TRASH_FILE);
+  gtk_box_pack_start (GTK_BOX (view->group_box), group, FALSE, TRUE, 0);
+  gtk_widget_show (group);
+
+  /* create the network group */
+  group = thunar_shortcut_group_new (_("NETWORK"),
+                                     THUNAR_SHORTCUT_NETWORK_FILE 
+                                     | THUNAR_SHORTCUT_NETWORK_MOUNT);
+  gtk_box_pack_start (GTK_BOX (view->group_box), group, FALSE, TRUE, 0);
+  gtk_widget_show (group);
 }
 
 
@@ -268,6 +301,11 @@ static void
 thunar_shortcuts_view_constructed (GObject *object)
 {
   ThunarShortcutsView *view = THUNAR_SHORTCUTS_VIEW (object);
+
+  /* load shortcuts in a series of idle handlers */
+  view->load_idle_id = g_idle_add (thunar_shortcuts_view_load_system_shortcuts, view);
+
+#if 0
   GtkTreeIter          iter;
   GtkTreeIter          child_iter;
   GtkTreePath         *path;
@@ -356,6 +394,7 @@ thunar_shortcuts_view_constructed (GObject *object)
   /* be notified when a shortcut changes */
   g_signal_connect_swapped (view->model, "row-changed",
                             G_CALLBACK (thunar_shortcuts_view_row_changed), view);
+#endif
 }
 
 
@@ -368,9 +407,11 @@ thunar_shortcuts_view_finalize (GObject *object)
   /* release the provider factory */
   g_object_unref (G_OBJECT (view->provider_factory));
 
-  /* release the shortcuts model */
-  if (view->model != NULL)
-    g_object_unref (view->model);
+  /* disconnect and release the volume monitor */
+  g_signal_handlers_disconnect_matched (view->volume_monitor,
+                                        G_SIGNAL_MATCH_DATA,
+                                        0, 0, NULL, NULL, view);
+  g_object_unref (view->volume_monitor);
 
   (*G_OBJECT_CLASS (thunar_shortcuts_view_parent_class)->finalize) (object);
 }
@@ -383,14 +424,12 @@ thunar_shortcuts_view_get_property (GObject    *object,
                                     GValue     *value,
                                     GParamSpec *pspec)
 {
+#if 0
   ThunarShortcutsView *view = THUNAR_SHORTCUTS_VIEW (object);
+#endif
 
   switch (prop_id)
     {
-    case PROP_MODEL:
-      g_value_set_object (value, view->model);
-      break;
-
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -405,14 +444,12 @@ thunar_shortcuts_view_set_property (GObject      *object,
                                     const GValue *value,
                                     GParamSpec   *pspec)
 {
+#if 0
   ThunarShortcutsView *view = THUNAR_SHORTCUTS_VIEW (object);
+#endif
 
   switch (prop_id)
     {
-    case PROP_MODEL:
-      view->model = g_value_dup_object (value);
-      break;
-
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -421,6 +458,7 @@ thunar_shortcuts_view_set_property (GObject      *object,
 
 
 
+#if 0
 static void
 thunar_shortcuts_view_row_inserted (ThunarShortcutsView *view,
                                     GtkTreePath         *path,
@@ -1274,28 +1312,528 @@ thunar_shortcuts_view_open (ThunarShortcutsView *view,
       g_signal_emit (view, view_signals[SHORTCUT_ACTIVATED], 0, file);
     }
 }
+#endif
+
+
+
+static gboolean
+thunar_shortcuts_view_load_system_shortcuts (gpointer user_data)
+{
+  ThunarShortcutsView *view = THUNAR_SHORTCUTS_VIEW (user_data);
+
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view), FALSE);
+
+  thunar_shortcuts_view_create_home_shortcut (view);
+  thunar_shortcuts_view_create_desktop_shortcut (view);
+  thunar_shortcuts_view_create_trash_shortcut (view);
+  thunar_shortcuts_view_create_network_shortcut (view);
+
+  /* load rest of the user dirs next */
+  view->load_idle_id = g_idle_add (thunar_shortcuts_view_load_user_dirs, view);
+
+  return FALSE;
+}
+
+
+
+static void
+thunar_shortcuts_view_create_home_shortcut (ThunarShortcutsView *view)
+{
+  ThunarShortcut       *shortcut;
+  GFile                *home_file;
+  GIcon                *icon;
+  gchar                *path;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
+
+  /* request a GFile for the home directory */
+  home_file = thunar_g_file_new_for_home ();
+
+  /* create $HOME information */
+  icon = g_themed_icon_new ("user-home");
+  path = g_file_get_path (home_file);
+  
+  /* create the $HOME shortcut */
+  shortcut = g_object_new (THUNAR_TYPE_SHORTCUT,
+                           "shortcut-type", THUNAR_SHORTCUT_REGULAR_FILE,
+                           "location", home_file,
+                           "icon", icon,
+                           "custom-name", NULL,
+                           "hidden", FALSE,
+                           "mutable", FALSE,
+                           "persistent", TRUE,
+                           NULL);
+
+  /* add the shortcut */
+  thunar_shortcuts_view_add_shortcut (view, shortcut);
+
+  /* release information */
+  g_free (path);
+  g_object_unref (icon);
+  g_object_unref (home_file);
+}
+
+
+
+static void
+thunar_shortcuts_view_create_desktop_shortcut (ThunarShortcutsView *view)
+{
+  ThunarShortcut       *shortcut;
+  GFile                *home_file;
+  GFile                *location;
+  GIcon                *icon;
+  gchar                *name = NULL;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
+
+  /* request a GFile for the home directory */
+  home_file = thunar_g_file_new_for_home ();
+
+  /* request a GFile for the desktop directory */
+  location = thunar_g_file_new_for_desktop ();
+
+  /* check if desktop is set to home (in that case, ignore it) */
+  if (!g_file_equal (home_file, location))
+    {
+      /* create desktop information */
+      icon = g_themed_icon_new ("user-desktop");
+      name = g_strdup (_("Desktop"));
+
+      /* create the desktop shortcut */
+      shortcut = g_object_new (THUNAR_TYPE_SHORTCUT,
+                               "shortcut-type", THUNAR_SHORTCUT_REGULAR_FILE,
+                               "location", location,
+                               "icon", icon,
+                               "custom-name", name,
+                               "hidden", FALSE,
+                               "mutable", FALSE,
+                               "persistent", TRUE,
+                               NULL);
+
+      /* add the shortcut */
+      thunar_shortcuts_view_add_shortcut (view, shortcut);
+
+      /* release desktop information */
+      g_free (name);
+      g_object_unref (icon);
+    }
+
+  /* release desktop and home files */
+  g_object_unref (location);
+  g_object_unref (home_file);
+}
+
+
+
+static void
+thunar_shortcuts_view_create_trash_shortcut (ThunarShortcutsView *view)
+{
+  ThunarShortcut       *shortcut;
+  GFile                *location;
+  GIcon                *icon;
+  gchar                *name = NULL;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
+
+  /* create trash information */
+  location = thunar_g_file_new_for_trash ();
+  icon = g_themed_icon_new ("user-trash");
+  name = g_strdup (_("Trash"));
+
+  /* create the trash shortcut */
+  shortcut = g_object_new (THUNAR_TYPE_SHORTCUT,
+                           "shortcut-type", THUNAR_SHORTCUT_TRASH_FILE,
+                           "location", location,
+                           "icon", icon,
+                           "custom-name", name,
+                           "hidden", FALSE,
+                           "mutable", FALSE,
+                           "persistent", TRUE,
+                           NULL);
+
+  /* add the shortcut */
+  thunar_shortcuts_view_add_shortcut (view, shortcut);
+
+  /* release trash information */
+  g_free (name);
+  g_object_unref (icon);
+  g_object_unref (location);
+}
+
+
+
+static void
+thunar_shortcuts_view_create_network_shortcut (ThunarShortcutsView *view)
+{
+  ThunarShortcut       *shortcut;
+  GFile                *location;
+  GIcon                *icon;
+  gchar                *name = NULL;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
+
+  /* create network information */
+  /* TODO we need a new "uri" property for ThunarShortcut that is 
+   * resolved into a real GFile and then into a ThunarFile 
+   * asynchronously, otherwise allocating the network GFile may
+   * slow down the Thunar startup */
+  location = g_file_new_for_uri ("network://");
+  icon = g_themed_icon_new (GTK_STOCK_NETWORK);
+  name = g_strdup (_("Browse Network"));
+
+  /* create the network shortcut */
+  shortcut = g_object_new (THUNAR_TYPE_SHORTCUT,
+                           "shortcut-type", THUNAR_SHORTCUT_NETWORK_FILE,
+                           "location", location,
+                           "icon", icon,
+                           "custom-name", name,
+                           "hidden", FALSE,
+                           "mutable", FALSE,
+                           "persistent", TRUE,
+                           NULL);
+
+  /* add the network shortcut */
+  thunar_shortcuts_view_add_shortcut (view, shortcut);
+
+  /* release network information */
+  g_free (name);
+  g_object_unref (icon);
+  g_object_unref (location);
+}
+
+
+
+static gboolean
+thunar_shortcuts_view_load_user_dirs (gpointer user_data)
+{
+  ThunarShortcutsView *view = THUNAR_SHORTCUTS_VIEW (user_data);
+
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view), FALSE);
+  
+  /* load GTK bookmarks next */
+  view->load_idle_id = g_idle_add (thunar_shortcuts_view_load_bookmarks, view);
+
+  return FALSE;
+}
+
+
+
+static gboolean
+thunar_shortcuts_view_load_bookmarks (gpointer user_data)
+{
+  ThunarShortcutsView *view = THUNAR_SHORTCUTS_VIEW (user_data);
+  ThunarShortcutType   type;
+  ThunarShortcut      *shortcut;
+  gboolean             is_local;
+  GFile               *bookmarks_file;
+  GFile               *home_file;
+  GFile               *location;
+  GIcon               *eject_icon;
+  GIcon               *icon;
+  gchar               *bookmarks_path;
+  gchar                line[2048];
+  gchar               *name;
+  FILE                *fp;
+
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view), FALSE);
+
+  /* create an eject icon */
+  eject_icon = g_themed_icon_new ("media-eject");
+
+  /* resolve the bookmarks file */
+  home_file = thunar_g_file_new_for_home ();
+  bookmarks_file = g_file_resolve_relative_path (home_file, ".gtk-bookmarks");
+  bookmarks_path = g_file_get_path (bookmarks_file);
+  g_object_unref (bookmarks_file);
+  g_object_unref (home_file);
+
+  /* TODO remove all existing bookmarks */
+  
+  /* open the GTK bookmarks file for reading */
+  fp = fopen (bookmarks_path, "r");
+  if (fp != NULL)
+    {
+      while (fgets (line, sizeof (line), fp) != NULL)
+        {
+          /* strip leading and trailing whitespace */
+          g_strstrip (line);
+
+          /* skip over the URI */
+          for (name = line; *name != '\0' && !g_ascii_isspace (*name); ++name);
+
+          /* zero-terminate the URI */
+          *name++ = '\0';
+
+          /* check if we have a name */
+          for (; g_ascii_isspace (*name); ++name);
+
+          /* check if we have something that looks like a URI */
+          if (exo_str_looks_like_an_uri (line))
+            {
+              /* parse the URI */
+              location = g_file_new_for_uri (line);
+
+              /* only set the name property if the name is not empty */
+              name = *name != '\0' ? g_strdup (name) : NULL;
+
+              /* set initial icon and type based on the URI scheme */
+              is_local = g_file_has_uri_scheme (location, "file");
+              if (is_local)
+                {
+                  icon = g_themed_icon_new ("folder");
+                  type = THUNAR_SHORTCUT_REGULAR_FILE;
+                }
+              else
+                {
+                  icon = g_themed_icon_new ("folder-remote");
+                  type = THUNAR_SHORTCUT_NETWORK_FILE;
+                }
+
+              /* create the shortcut */
+              shortcut = g_object_new (THUNAR_TYPE_SHORTCUT,
+                                       "shortcut-type", type,
+                                       "location", location,
+                                       "icon", icon,
+                                       "eject-icon", eject_icon,
+                                       "custom-name", name,
+                                       "hidden", FALSE,
+                                       "mutable", TRUE,
+                                       "persistent", TRUE,
+                                       NULL);
+
+              /* add the shortcut */
+              thunar_shortcuts_view_add_shortcut (view, shortcut);
+
+              /* release file information */
+              g_free (name);
+              g_object_unref (icon);
+              g_object_unref (location);
+            }
+        }
+
+      /* close the file handle */
+      fclose (fp);
+    }
+  
+  /* free the bookmarks file path */
+  g_free (bookmarks_path);
+
+  /* release the eject icon */
+  g_object_unref (eject_icon);
+
+  /* TODO monitor the bookmarks file for changes */
+
+  /* load volumes next */
+  view->load_idle_id = g_idle_add (thunar_shortcuts_view_load_volumes, view);
+
+  return FALSE;
+}
+
+
+
+static gboolean
+thunar_shortcuts_view_load_volumes (gpointer user_data)
+{
+  ThunarShortcutsView *view = THUNAR_SHORTCUTS_VIEW (user_data);
+  GList               *mounts;
+  GList               *volumes;
+  GList               *lp;
+
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view), FALSE);
+
+  /* get the default volume monitor */
+  view->volume_monitor = g_volume_monitor_get ();
+
+  /* get a list of all volumes available */
+  volumes = g_volume_monitor_get_volumes (view->volume_monitor);
+
+  /* create shortcuts for the volumes */
+  for (lp = volumes; lp != NULL; lp = lp->next)
+    {
+      /* add a new volume shortcut */
+      thunar_shortcuts_view_volume_added (view, lp->data, view->volume_monitor);
+    }
+
+  /* release the volume list */
+  g_list_free (volumes);
+
+  /* get a list of all mounts available */
+  mounts = g_volume_monitor_get_mounts (view->volume_monitor);
+
+  /* create shortcuts for the mounts */
+  for (lp = mounts; lp != NULL; lp = lp->next)
+    {
+      /* add a new mount shortcut */
+      thunar_shortcuts_view_mount_added (view, lp->data, view->volume_monitor);
+    }
+
+  /* release the mount list */
+  g_list_free (mounts);
+
+  /* be notified of new and removed volumes on the system */
+  g_signal_connect_swapped (view->volume_monitor, "volume-added",
+                            G_CALLBACK (thunar_shortcuts_view_volume_added), view);
+#if 0
+  g_signal_connect_swapped (view->volume_monitor, "volume-removed",
+                            G_CALLBACK (thunar_shortcuts_view_volume_removed), view);
+#endif
+  g_signal_connect_swapped (view->volume_monitor, "mount-added",
+                            G_CALLBACK (thunar_shortcuts_view_mount_added), view);
+#if 0
+  g_signal_connect_swapped (view->volume_monitor, "mount-removed",
+                            G_CALLBACK (thunar_shortcuts_view_mount_removed), view);
+#endif
+
+  /* reset the load idle ID */
+  view->load_idle_id = 0;
+
+  return FALSE;
+};
+
+
+
+static void
+thunar_shortcuts_view_volume_added (ThunarShortcutsView *view,
+                                    GVolume              *volume,
+                                    GVolumeMonitor       *monitor)
+{
+  ThunarShortcut *shortcut;
+  gboolean        hidden = FALSE;
+  GIcon          *eject_icon;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
+  _thunar_return_if_fail (G_IS_VOLUME (volume));
+  _thunar_return_if_fail (G_IS_VOLUME_MONITOR (monitor));
+
+  /* read information from the volume */
+  eject_icon = g_themed_icon_new ("media-eject");
+
+  /* hide the volume if there is no media */
+  if (!thunar_g_volume_is_present (volume))
+    hidden = TRUE;
+
+  /* hide the volume if it is not removable (this can be 
+   * overridden by the user in the shortcuts editor) */
+  if (!thunar_g_volume_is_removable (volume))
+    hidden = TRUE;
+
+  /* create a shortcut for the volume */
+  shortcut = g_object_new (THUNAR_TYPE_SHORTCUT,
+                           "shortcut-type", THUNAR_SHORTCUT_REGULAR_VOLUME,
+                           "volume", volume,
+                           "eject-icon", eject_icon,
+                           "hidden", hidden,
+                           "mutable", FALSE,
+                           "persistent", FALSE,
+                           NULL);
+
+  /* add the shortcut to the view */
+  thunar_shortcuts_view_add_shortcut (view, shortcut);
+
+  /* release volume information */
+  g_object_unref (eject_icon);
+}
+
+
+
+static void
+thunar_shortcuts_view_mount_added (ThunarShortcutsView *view,
+                                    GMount               *mount,
+                                    GVolumeMonitor       *monitor)
+{
+  ThunarShortcutType shortcut_type;
+  ThunarShortcut    *shortcut;
+  GVolume           *volume;
+  GFile             *location;
+  GIcon             *eject_icon;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
+  _thunar_return_if_fail (G_IS_MOUNT (mount));
+  _thunar_return_if_fail (G_IS_VOLUME_MONITOR (monitor));
+
+  /* only create the shortcut if it has no volume */
+  volume = g_mount_get_volume (mount);
+  if (volume != NULL)
+    {
+      /* release the volume again */
+      g_object_unref (volume);
+    }
+  else
+    {
+      /* read information from the mount */
+      location = g_mount_get_root (mount);
+      eject_icon = g_themed_icon_new ("media-eject");
+
+      /* determine the shortcut type */
+      if (g_file_has_uri_scheme (location, "file"))
+        shortcut_type = THUNAR_SHORTCUT_REGULAR_MOUNT;
+      else if (g_file_has_uri_scheme (location, "archive"))
+        shortcut_type = THUNAR_SHORTCUT_ARCHIVE_MOUNT;
+      else
+        shortcut_type = THUNAR_SHORTCUT_NETWORK_MOUNT;
+
+      /* create a shortcut for the mount */
+      shortcut = g_object_new (THUNAR_TYPE_SHORTCUT,
+                               "shortcut-type", shortcut_type,
+                               "location", location,
+                               "mount", mount,
+                               "eject-icon", eject_icon,
+                               "hidden", FALSE,
+                               "mutable", FALSE,
+                               "persistent", FALSE,
+                               NULL);
+
+      /* add the shortcut to the view */
+      thunar_shortcuts_view_add_shortcut (view, shortcut);
+
+      /* release volume information */
+      g_object_unref (eject_icon);
+      g_object_unref (location);
+    }
+}
+
+
+
+static void
+thunar_shortcuts_view_add_shortcut (ThunarShortcutsView *view,
+                                    ThunarShortcut      *shortcut)
+{
+  ThunarShortcutGroup *group;
+  gboolean             shortcut_inserted = FALSE;
+  GList               *children;
+  GList               *child;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
+
+  children = gtk_container_get_children (GTK_CONTAINER (view->group_box));
+  for (child = children; child != NULL && !shortcut_inserted; child = child->next)
+    {
+      group = THUNAR_SHORTCUT_GROUP (child->data);
+
+      if (thunar_shortcut_group_try_add_shortcut (group, shortcut))
+        shortcut_inserted = TRUE;
+    }
+  g_list_free (children);
+
+  /* TODO improve this error message by including the URI or volume/mount name */
+  if (!shortcut_inserted)
+    g_warning ("Failed to add a shortcut to the side pane.");
+}
 
 
 
 /**
  * thunar_shortcuts_view_new:
  *
- * Allocates a new #ThunarShortcutsView instance and associates
- * it with the default #ThunarShortcutsModel instance.
+ * Allocates a new #ThunarShortcutsView instance.
  *
  * Return value: the newly allocated #ThunarShortcutsView instance.
  **/
 GtkWidget*
 thunar_shortcuts_view_new (void)
 {
-  ThunarShortcutsModel *model;
-  GtkWidget            *view;
-
-  model = thunar_shortcuts_model_get_default ();
-  view = g_object_new (THUNAR_TYPE_SHORTCUTS_VIEW, "model", model, NULL);
-  g_object_unref (G_OBJECT (model));
-
-  return view;
+  return g_object_new (THUNAR_TYPE_SHORTCUTS_VIEW, NULL);
 }
 
 
@@ -1306,6 +1844,8 @@ thunar_shortcuts_view_has_file (ThunarShortcutsView *view,
 {
   _thunar_return_val_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view), FALSE);
   _thunar_return_val_if_fail (THUNAR_IS_FILE (file), FALSE);
+
+  /* TODO */
 
   return FALSE;
 }
@@ -1318,6 +1858,8 @@ thunar_shortcuts_view_add_file (ThunarShortcutsView *view,
 {
   _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
   _thunar_return_if_fail (THUNAR_IS_FILE (file));
+
+  /* TODO */
 }
 
 
@@ -1338,9 +1880,12 @@ thunar_shortcuts_view_select_by_file (ThunarShortcutsView *view,
   _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
   _thunar_return_if_fail (THUNAR_IS_FILE (file));
 
+  /* TODO */
+#if 0
   thunar_shortcuts_view_foreach_row (view,
                                      thunar_shortcuts_view_update_selection_by_file,
                                      file);
+#endif
 }
 
 

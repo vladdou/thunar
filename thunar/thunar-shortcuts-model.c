@@ -934,7 +934,7 @@ thunar_shortcuts_model_find_category (ThunarShortcutsModel    *model,
             item_belongs_here = TRUE;
 
           /* mounts with mount points that are in archive:// belong here */
-          if (type == THUNAR_SHORTCUT_STANDALONE_MOUNT 
+          if (type == THUNAR_SHORTCUT_REGULAR_MOUNT 
               && file != NULL 
               && g_file_has_uri_scheme (file, "archive"))
             {
@@ -942,7 +942,7 @@ thunar_shortcuts_model_find_category (ThunarShortcutsModel    *model,
             }
 
           /* mounts with mount points that are in file:// belong here */
-          if (type == THUNAR_SHORTCUT_STANDALONE_MOUNT 
+          if (type == THUNAR_SHORTCUT_REGULAR_MOUNT 
               && file != NULL 
               && g_file_has_uri_scheme (file, "file"))
             {
@@ -966,7 +966,7 @@ thunar_shortcuts_model_find_category (ThunarShortcutsModel    *model,
             item_belongs_here = TRUE;
 
           /* remote mounts belong here */
-          if (type == THUNAR_SHORTCUT_STANDALONE_MOUNT
+          if (type == THUNAR_SHORTCUT_REGULAR_MOUNT
               && file != NULL 
               && !g_file_has_uri_scheme (file, "archive")
               && !g_file_has_uri_scheme (file, "file")
@@ -1633,7 +1633,7 @@ thunar_shortcuts_model_mount_added (ThunarShortcutsModel *model,
 
       /* create a shortcut for the mount */
       shortcut = g_object_new (THUNAR_TYPE_SHORTCUT,
-                               "shortcut-type", THUNAR_SHORTCUT_STANDALONE_MOUNT,
+                               "shortcut-type", THUNAR_SHORTCUT_REGULAR_MOUNT,
                                "location", location,
                                "mount", mount,
                                "eject-icon", eject_icon,

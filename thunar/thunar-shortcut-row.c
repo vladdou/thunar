@@ -1278,7 +1278,7 @@ thunar_shortcut_row_mount_changed (ThunarShortcutRow *row)
 
   /* don't update the row based on the mount unless we have
    * a standalone mount that is not associated with a volume */
-  if (row->shortcut_type != THUNAR_SHORTCUT_STANDALONE_MOUNT)
+  if (row->shortcut_type != THUNAR_SHORTCUT_REGULAR_MOUNT)
     return;
 
   if (row->mount != NULL)
@@ -1314,7 +1314,7 @@ thunar_shortcut_row_shortcut_type_changed (ThunarShortcutRow *row)
       thunar_shortcut_row_location_changed (row);
       break;
 
-    case THUNAR_SHORTCUT_STANDALONE_MOUNT:
+    case THUNAR_SHORTCUT_REGULAR_MOUNT:
       thunar_shortcut_row_mount_changed (row);
       break;
 

@@ -69,6 +69,9 @@ void               thunar_shortcut_set_custom_name   (ThunarShortcut    *shortcu
 ThunarShortcutType thunar_shortcut_get_shortcut_type (ThunarShortcut    *shortcut);
 void               thunar_shortcut_set_shortcut_type (ThunarShortcut    *shortcut,
                                                       ThunarShortcutType shortcut_type);
+ThunarIconSize     thunar_shortcut_get_icon_size     (ThunarShortcut    *shortcut);
+void               thunar_shortcut_set_icon_size     (ThunarShortcut    *shortcut,
+                                                      ThunarIconSize     icon_size);
 gboolean           thunar_shortcut_get_hidden        (ThunarShortcut    *shortcut);
 void               thunar_shortcut_set_hidden        (ThunarShortcut    *shortcut,
                                                       gboolean           hidden);

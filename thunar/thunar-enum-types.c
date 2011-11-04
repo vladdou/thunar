@@ -340,17 +340,20 @@ thunar_shortcut_type_get_type (void)
 
   if (G_UNLIKELY (type == G_TYPE_INVALID))
     {
-      static const GEnumValue values[] =
+      static const GFlagsValue values[] =
       {
         { THUNAR_SHORTCUT_REGULAR_FILE,     "THUNAR_SHORTCUT_REGULAR_FILE",     "regular-file",     },
+        { THUNAR_SHORTCUT_TRASH_FILE,       "THUNAR_SHORTCUT_NETWORK_FILE",     "network-file",     },
         { THUNAR_SHORTCUT_NETWORK_FILE,     "THUNAR_SHORTCUT_NETWORK_FILE",     "network-file",     },
-        { THUNAR_SHORTCUT_STANDALONE_MOUNT, "THUNAR_SHORTCUT_STANDALONE_MOUNT", "standalone-mount", },
-        { THUNAR_SHORTCUT_EJECTABLE_VOLUME, "THUNAR_SHORTCUT_EJECTABLE_VOLUME", "ejectable-volume", },
         { THUNAR_SHORTCUT_REGULAR_VOLUME,   "THUNAR_SHORTCUT_REGULAR_VOLUME",   "regular-volume",   },
+        { THUNAR_SHORTCUT_EJECTABLE_VOLUME, "THUNAR_SHORTCUT_EJECTABLE_VOLUME", "ejectable-volume", },
+        { THUNAR_SHORTCUT_REGULAR_MOUNT,    "THUNAR_SHORTCUT_REGULAR_MOUNT",    "regular-mount",    },
+        { THUNAR_SHORTCUT_ARCHIVE_MOUNT,    "THUNAR_SHORTCUT_ARCHIVE_MOUNT",    "archive-mount",    },
+        { THUNAR_SHORTCUT_NETWORK_MOUNT,    "THUNAR_SHORTCUT_NETWORK_MOUNT",    "network-mount",    },
         { 0,                                NULL,                               NULL,               },
       };
 
-      type = g_enum_register_static (I_("ThunarShortcutType"), values);
+      type = g_flags_register_static (I_("ThunarShortcutType"), values);
     }
 
   return type;

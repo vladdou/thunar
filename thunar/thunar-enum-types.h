@@ -297,16 +297,18 @@ GType thunar_file_mode_get_type (void) G_GNUC_CONST;
 /**
  * ThunarShortcutType:
  *
- * Enumeration used for classifying the different shortcuts
- * in #ThunarShortcutsModel.
+ * Flags used for classifying the different shortcuts.
  **/
 typedef enum
 {
-  THUNAR_SHORTCUT_REGULAR_FILE,
-  THUNAR_SHORTCUT_NETWORK_FILE,
-  THUNAR_SHORTCUT_STANDALONE_MOUNT,
-  THUNAR_SHORTCUT_EJECTABLE_VOLUME,
-  THUNAR_SHORTCUT_REGULAR_VOLUME,
+  THUNAR_SHORTCUT_REGULAR_FILE     = 1 << 0,
+  THUNAR_SHORTCUT_TRASH_FILE       = 1 << 1,
+  THUNAR_SHORTCUT_NETWORK_FILE     = 1 << 2,
+  THUNAR_SHORTCUT_REGULAR_VOLUME   = 1 << 3,
+  THUNAR_SHORTCUT_EJECTABLE_VOLUME = 1 << 4,
+  THUNAR_SHORTCUT_REGULAR_MOUNT    = 1 << 5,
+  THUNAR_SHORTCUT_ARCHIVE_MOUNT    = 1 << 6,
+  THUNAR_SHORTCUT_NETWORK_MOUNT    = 1 << 7,
 } ThunarShortcutType;
 
 GType thunar_shortcut_type_get_type (void) G_GNUC_CONST;

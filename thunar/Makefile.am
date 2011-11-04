@@ -173,6 +173,8 @@ Thunar_SOURCES =							\
 	thunar-session-client.h						\
 	thunar-shortcut.c						\
 	thunar-shortcut.h						\
+	thunar-shortcut-group.c						\
+	thunar-shortcut-group.h						\
 	thunar-shortcut-row.c						\
 	thunar-shortcut-row.h						\
 	thunar-shortcuts-icon-renderer.c				\
