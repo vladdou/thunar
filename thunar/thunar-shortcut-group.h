@@ -37,18 +37,22 @@ typedef struct _ThunarShortcutGroupPrivate ThunarShortcutGroupPrivate;
 typedef struct _ThunarShortcutGroupClass   ThunarShortcutGroupClass;
 typedef struct _ThunarShortcutGroup        ThunarShortcutGroup;
 
-GType      thunar_shortcut_group_get_type             (void) G_GNUC_CONST;
+GType      thunar_shortcut_group_get_type               (void) G_GNUC_CONST;
 
-GtkWidget *thunar_shortcut_group_new                  (const gchar         *label,
-                                                       ThunarShortcutType   accepted_types);
-gboolean   thunar_shortcut_group_try_add_shortcut     (ThunarShortcutGroup *group,
-                                                       ThunarShortcut      *shortcut);
-void       thunar_shortcut_group_unselect_shortcuts   (ThunarShortcutGroup *group,
-                                                       ThunarShortcut      *exception);
-void       thunar_shortcut_group_unprelight_shortcuts (ThunarShortcutGroup *group,
-                                                       ThunarShortcut      *exception);
-void       thunar_shortcut_group_update_selection     (ThunarShortcutGroup *group,
-                                                       ThunarFile          *file);
+GtkWidget *thunar_shortcut_group_new                    (const gchar         *label,
+                                                         ThunarShortcutType   accepted_types);
+gboolean   thunar_shortcut_group_try_add_shortcut       (ThunarShortcutGroup *group,
+                                                         ThunarShortcut      *shortcut);
+void       thunar_shortcut_group_unselect_shortcuts     (ThunarShortcutGroup *group,
+                                                         ThunarShortcut      *exception);
+void       thunar_shortcut_group_unprelight_shortcuts   (ThunarShortcutGroup *group,
+                                                         ThunarShortcut      *exception);
+void       thunar_shortcut_group_update_selection       (ThunarShortcutGroup *group,
+                                                         ThunarFile          *file);
+void       thunar_shortcut_group_remove_volume_shortcut (ThunarShortcutGroup *group,
+                                                         GVolume             *volume);
+void       thunar_shortcut_group_remove_mount_shortcut  (ThunarShortcutGroup *group,
+                                                         GMount              *mount);
 
 G_END_DECLS
 

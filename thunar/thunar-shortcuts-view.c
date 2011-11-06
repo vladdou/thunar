@@ -104,6 +104,18 @@ static void               thunar_shortcuts_view_volume_added             (Thunar
 static void               thunar_shortcuts_view_mount_added              (ThunarShortcutsView                *view,
                                                                           GMount                             *mount,
                                                                           GVolumeMonitor                     *monitor);
+static void               thunar_shortcuts_view_volume_removed           (ThunarShortcutsView                *view,
+                                                                          GVolume                            *volume,
+                                                                          GVolumeMonitor                     *monitor);
+static void               thunar_shortcuts_view_remove_volume_shortcut   (ThunarShortcutsView                *view,
+                                                                          ThunarShortcutGroup                *group,
+                                                                          gpointer                            user_data);
+static void               thunar_shortcuts_view_mount_removed            (ThunarShortcutsView                *view,
+                                                                          GMount                             *mount,
+                                                                          GVolumeMonitor                     *monitor);
+static void               thunar_shortcuts_view_remove_mount_shortcut    (ThunarShortcutsView                *view,
+                                                                          ThunarShortcutGroup                *group,
+                                                                          gpointer                            user_data);
 static void               thunar_shortcuts_view_add_shortcut             (ThunarShortcutsView                *view,
                                                                           ThunarShortcut                     *shortcut);
 static void               thunar_shortcuts_view_shortcut_activated       (ThunarShortcutsView                *view,
@@ -126,27 +138,9 @@ static void               thunar_shortcuts_view_open                     (Thunar
                                                                           ThunarFile                         *file,
                                                                           gboolean                            new_window);
 #if 0
-static void               thunar_shortcuts_view_row_inserted             (ThunarShortcutsView              *view,
-                                                                          GtkTreePath                      *path,
-                                                                          GtkTreeIter                      *iter,
-                                                                          GtkTreeModel                     *model);
 static void               thunar_shortcuts_view_row_deleted              (ThunarShortcutsView              *view,
                                                                           GtkTreePath                      *path,
                                                                           GtkTreeModel                     *model);
-static void               thunar_shortcuts_view_row_changed              (ThunarShortcutsView              *view,
-                                                                          GtkTreePath                      *path,
-                                                                          GtkTreeIter                      *iter,
-                                                                          GtkTreeModel                     *model);
-static gboolean           thunar_shortcuts_view_flash_expander           (gpointer                          user_data);
-static GtkWidget *        thunar_shortcuts_view_get_expander_at          (ThunarShortcutsView              *view,
-                                                                          gint                              index);
-static void               thunar_shortcuts_view_row_activated            (ThunarShortcutsView              *view,
-                                                                          ThunarFile                       *file,
-                                                                          gboolean                          open_in_new_window,
-                                                                          ThunarShortcutRow                *row);
-static void               thunar_shortcuts_view_row_state_changed        (ThunarShortcutsView              *view,
-                                                                          GtkStateType                      previous_state,
-                                                                          ThunarShortcutRow                *row);
 static gboolean           thunar_shortcuts_view_row_context_menu         (ThunarShortcutsView              *view,
                                                                           GtkWidget                        *widget);
 static void               thunar_shortcuts_view_row_open                 (ThunarShortcutsView              *view);
@@ -159,15 +153,6 @@ static void               thunar_shortcuts_view_open                     (Thunar
                                                                           gboolean                          new_window);
 static ThunarShortcutRow *thunar_shortcuts_view_get_selected_row         (ThunarShortcutsView              *view);
 static void               thunar_shortcuts_view_find_selected_row        (ThunarShortcutsView              *view,
-                                                                          ThunarShortcutRow                *row,
-                                                                          gpointer                          user_data);
-static void               thunar_shortcuts_view_foreach_row              (ThunarShortcutsView              *view,
-                                                                          ThunarShortcutsViewForeachRowFunc func,
-                                                                          gpointer                          user_data);
-static void               thunar_shortcuts_view_unselect_rows            (ThunarShortcutsView              *view,
-                                                                          ThunarShortcutRow                *row,
-                                                                          gpointer                          user_data);
-static void               thunar_shortcuts_view_unprelight_rows          (ThunarShortcutsView              *view,
                                                                           ThunarShortcutRow                *row,
                                                                           gpointer                          user_data);
 #endif
@@ -1133,16 +1118,12 @@ thunar_shortcuts_view_load_volumes (gpointer user_data)
   /* be notified of new and removed volumes on the system */
   g_signal_connect_swapped (view->volume_monitor, "volume-added",
                             G_CALLBACK (thunar_shortcuts_view_volume_added), view);
-#if 0
   g_signal_connect_swapped (view->volume_monitor, "volume-removed",
                             G_CALLBACK (thunar_shortcuts_view_volume_removed), view);
-#endif
   g_signal_connect_swapped (view->volume_monitor, "mount-added",
                             G_CALLBACK (thunar_shortcuts_view_mount_added), view);
-#if 0
   g_signal_connect_swapped (view->volume_monitor, "mount-removed",
                             G_CALLBACK (thunar_shortcuts_view_mount_removed), view);
-#endif
 
   /* reset the load idle ID */
   view->load_idle_id = 0;
@@ -1197,9 +1178,41 @@ thunar_shortcuts_view_volume_added (ThunarShortcutsView *view,
 
 
 static void
+thunar_shortcuts_view_volume_removed (ThunarShortcutsView *view,
+                                      GVolume             *volume,
+                                      GVolumeMonitor      *monitor)
+{
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
+  _thunar_return_if_fail (G_IS_VOLUME (volume));
+  _thunar_return_if_fail (G_IS_VOLUME_MONITOR (monitor));
+
+  thunar_shortcuts_view_foreach_group (view,
+                                       thunar_shortcuts_view_remove_volume_shortcut,
+                                       volume);
+}
+
+
+
+static void
+thunar_shortcuts_view_remove_volume_shortcut (ThunarShortcutsView *view,
+                                              ThunarShortcutGroup *group,
+                                              gpointer             user_data)
+{
+  GVolume *volume = G_VOLUME (user_data);
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_GROUP (group));
+  _thunar_return_if_fail (G_IS_VOLUME (volume));
+
+  thunar_shortcut_group_remove_volume_shortcut (group, volume);
+}
+
+
+
+static void
 thunar_shortcuts_view_mount_added (ThunarShortcutsView *view,
-                                    GMount               *mount,
-                                    GVolumeMonitor       *monitor)
+                                   GMount               *mount,
+                                   GVolumeMonitor       *monitor)
 {
   ThunarShortcutType shortcut_type;
   ThunarShortcut    *shortcut;
@@ -1250,6 +1263,38 @@ thunar_shortcuts_view_mount_added (ThunarShortcutsView *view,
       g_object_unref (eject_icon);
       g_object_unref (location);
     }
+}
+
+
+
+static void
+thunar_shortcuts_view_mount_removed (ThunarShortcutsView *view,
+                                     GMount              *mount,
+                                     GVolumeMonitor      *monitor)
+{
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
+  _thunar_return_if_fail (G_IS_MOUNT (mount));
+  _thunar_return_if_fail (G_IS_VOLUME_MONITOR (monitor));
+
+  thunar_shortcuts_view_foreach_group (view,
+                                       thunar_shortcuts_view_remove_mount_shortcut,
+                                       mount);
+}
+
+
+
+static void
+thunar_shortcuts_view_remove_mount_shortcut (ThunarShortcutsView *view,
+                                             ThunarShortcutGroup *group,
+                                             gpointer             user_data)
+{
+  GMount *mount = G_MOUNT (user_data);
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_GROUP (group));
+  _thunar_return_if_fail (G_IS_MOUNT (mount));
+
+  thunar_shortcut_group_remove_mount_shortcut (group, mount);
 }
 
 

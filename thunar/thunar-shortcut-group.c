@@ -435,3 +435,65 @@ thunar_shortcut_group_update_selection (ThunarShortcutGroup *group,
 
   g_list_free (children);
 }
+
+
+
+void
+thunar_shortcut_group_remove_volume_shortcut (ThunarShortcutGroup *group,
+                                              GVolume             *volume)
+{
+  ThunarShortcut *shortcut;
+  GVolume        *shortcut_volume;
+  GList          *children;
+  GList          *iter;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_GROUP (group));
+  _thunar_return_if_fail (G_IS_VOLUME (volume));
+
+  children = gtk_container_get_children (GTK_CONTAINER (group->shortcuts));
+
+  for (iter = children; iter != NULL; iter = iter->next)
+    {
+      shortcut = THUNAR_SHORTCUT (iter->data);
+      shortcut_volume = thunar_shortcut_get_volume (shortcut);
+
+      if (shortcut_volume == volume)
+        gtk_container_remove (GTK_CONTAINER (group->shortcuts),
+                              GTK_WIDGET (shortcut));
+    }
+
+  g_list_free (children);
+}
+
+
+
+void
+thunar_shortcut_group_remove_mount_shortcut (ThunarShortcutGroup *group,
+                                             GMount              *mount)
+{
+  ThunarShortcut *shortcut;
+  GMount        *shortcut_mount;
+  GList          *children;
+  GList          *iter;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_GROUP (group));
+  _thunar_return_if_fail (G_IS_MOUNT (mount));
+
+  children = gtk_container_get_children (GTK_CONTAINER (group->shortcuts));
+
+  for (iter = children; iter != NULL; iter = iter->next)
+    {
+      shortcut = THUNAR_SHORTCUT (iter->data);
+
+      if (!thunar_shortcut_get_persistent (shortcut))
+        {
+          shortcut_mount = thunar_shortcut_get_mount (shortcut);
+
+          if (shortcut_mount == mount)
+            gtk_container_remove (GTK_CONTAINER (group->shortcuts),
+                                  GTK_WIDGET (shortcut));
+        }
+    }
+
+  g_list_free (children);
+}
