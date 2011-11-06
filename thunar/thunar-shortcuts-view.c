@@ -74,40 +74,57 @@ enum
 
 
 
-#if 0
-typedef void (*ThunarShortcutsViewForeachRowFunc) (ThunarShortcutsView *view,
-                                                   ThunarShortcutRow   *row,
-                                                   gpointer             user_data);
-#endif
+typedef void (*ThunarShortcutsViewForeachGroupFunc) (ThunarShortcutsView *view,
+                                                     ThunarShortcutGroup *group,
+                                                     gpointer             user_data);
 
 
 
-static void               thunar_shortcuts_view_constructed              (GObject                          *object);
-static void               thunar_shortcuts_view_finalize                 (GObject                          *object);
-static void               thunar_shortcuts_view_get_property             (GObject                          *object,
-                                                                          guint                             prop_id,
-                                                                          GValue                           *value,
-                                                                          GParamSpec                       *pspec);
-static void               thunar_shortcuts_view_set_property             (GObject                          *object,
-                                                                          guint                             prop_id,
-                                                                          const GValue                     *value,
-                                                                          GParamSpec                       *pspec);
-static gboolean           thunar_shortcuts_view_load_system_shortcuts    (gpointer                          user_data);
-static void               thunar_shortcuts_view_create_home_shortcut     (ThunarShortcutsView              *view);
-static void               thunar_shortcuts_view_create_desktop_shortcut  (ThunarShortcutsView              *view);
-static void               thunar_shortcuts_view_create_trash_shortcut    (ThunarShortcutsView              *view);
-static void               thunar_shortcuts_view_create_network_shortcut  (ThunarShortcutsView              *view);
-static gboolean           thunar_shortcuts_view_load_user_dirs           (gpointer                          user_data);
-static gboolean           thunar_shortcuts_view_load_bookmarks           (gpointer                          user_data);
-static gboolean           thunar_shortcuts_view_load_volumes             (gpointer                          user_data);
-static void               thunar_shortcuts_view_volume_added             (ThunarShortcutsView              *view,
-                                                                          GVolume                          *volume,
-                                                                          GVolumeMonitor                   *monitor);
-static void               thunar_shortcuts_view_mount_added              (ThunarShortcutsView              *view,
-                                                                          GMount                           *mount,
-                                                                          GVolumeMonitor                   *monitor);
-static void               thunar_shortcuts_view_add_shortcut             (ThunarShortcutsView              *view,
-                                                                          ThunarShortcut                   *shortcut);
+static void               thunar_shortcuts_view_constructed              (GObject                            *object);
+static void               thunar_shortcuts_view_finalize                 (GObject                            *object);
+static void               thunar_shortcuts_view_get_property             (GObject                            *object,
+                                                                          guint                               prop_id,
+                                                                          GValue                             *value,
+                                                                          GParamSpec                         *pspec);
+static void               thunar_shortcuts_view_set_property             (GObject                            *object,
+                                                                          guint                               prop_id,
+                                                                          const GValue                       *value,
+                                                                          GParamSpec                         *pspec);
+static gboolean           thunar_shortcuts_view_load_system_shortcuts    (gpointer                            user_data);
+static void               thunar_shortcuts_view_create_home_shortcut     (ThunarShortcutsView                *view);
+static void               thunar_shortcuts_view_create_desktop_shortcut  (ThunarShortcutsView                *view);
+static void               thunar_shortcuts_view_create_trash_shortcut    (ThunarShortcutsView                *view);
+static void               thunar_shortcuts_view_create_network_shortcut  (ThunarShortcutsView                *view);
+static gboolean           thunar_shortcuts_view_load_user_dirs           (gpointer                            user_data);
+static gboolean           thunar_shortcuts_view_load_bookmarks           (gpointer                            user_data);
+static gboolean           thunar_shortcuts_view_load_volumes             (gpointer                            user_data);
+static void               thunar_shortcuts_view_volume_added             (ThunarShortcutsView                *view,
+                                                                          GVolume                            *volume,
+                                                                          GVolumeMonitor                     *monitor);
+static void               thunar_shortcuts_view_mount_added              (ThunarShortcutsView                *view,
+                                                                          GMount                             *mount,
+                                                                          GVolumeMonitor                     *monitor);
+static void               thunar_shortcuts_view_add_shortcut             (ThunarShortcutsView                *view,
+                                                                          ThunarShortcut                     *shortcut);
+static void               thunar_shortcuts_view_shortcut_activated       (ThunarShortcutsView                *view,
+                                                                          ThunarFile                         *file,
+                                                                          gboolean                            open_in_new_window,
+                                                                          ThunarShortcut                     *shortcut);
+static void               thunar_shortcuts_view_shortcut_state_changed   (ThunarShortcutsView                *view,
+                                                                          GtkStateType                        previous_state,
+                                                                          ThunarShortcut                     *shortcut);
+static void               thunar_shortcuts_view_unselect_shortcuts       (ThunarShortcutsView                *view,
+                                                                          ThunarShortcutGroup                *group,
+                                                                          gpointer                            user_data);
+static void               thunar_shortcuts_view_unprelight_shortcuts     (ThunarShortcutsView                *view,
+                                                                          ThunarShortcutGroup                *group,
+                                                                          gpointer                            user_data);
+static void               thunar_shortcuts_view_foreach_group            (ThunarShortcutsView                *view,
+                                                                          ThunarShortcutsViewForeachGroupFunc func,
+                                                                          gpointer                            user_data);
+static void               thunar_shortcuts_view_open                     (ThunarShortcutsView                *view,
+                                                                          ThunarFile                         *file,
+                                                                          gboolean                            new_window);
 #if 0
 static void               thunar_shortcuts_view_row_inserted             (ThunarShortcutsView              *view,
                                                                           GtkTreePath                      *path,
@@ -1725,9 +1742,142 @@ thunar_shortcuts_view_add_shortcut (ThunarShortcutsView *view,
     }
   g_list_free (children);
 
-  /* TODO improve this error message by including the URI or volume/mount name */
-  if (!shortcut_inserted)
-    g_warning ("Failed to add a shortcut to the side pane.");
+  if (shortcut_inserted)
+    {
+      /* connect to the activated signal */
+      g_signal_connect_swapped (shortcut, "activated",
+                                G_CALLBACK (thunar_shortcuts_view_shortcut_activated),
+                                view);
+
+      /* react on state changes */
+      g_signal_connect_swapped (shortcut, "state-changed",
+                                G_CALLBACK (thunar_shortcuts_view_shortcut_state_changed),
+                                view);
+    }
+  else
+    {
+      /* TODO improve this error message by including the URI or volume/mount name */
+      g_warning ("Failed to add a shortcut to the side pane.");
+    }
+}
+
+
+
+static void
+thunar_shortcuts_view_shortcut_activated (ThunarShortcutsView *view,
+                                          ThunarFile          *file,
+                                          gboolean             open_in_new_window,
+                                          ThunarShortcut      *shortcut)
+{
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
+  _thunar_return_if_fail (THUNAR_IS_FILE (file));
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
+
+  /* TODO cancel all other pending activations */
+  
+  /* open the activated shortcut */
+  thunar_shortcuts_view_open (view, file, open_in_new_window);
+}
+
+
+
+static void
+thunar_shortcuts_view_shortcut_state_changed (ThunarShortcutsView *view,
+                                              GtkStateType         previous_state,
+                                              ThunarShortcut      *shortcut)
+{
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
+
+  /* check if the shortcut has been selected or highlighted */
+  if (gtk_widget_get_state (GTK_WIDGET (shortcut)) == GTK_STATE_SELECTED)
+    {
+      /* unselect all other shortcuts */
+      thunar_shortcuts_view_foreach_group (view,
+                                           thunar_shortcuts_view_unselect_shortcuts,
+                                           shortcut);
+    }
+  else if (gtk_widget_get_state (GTK_WIDGET (shortcut)) == GTK_STATE_PRELIGHT)
+    {
+      /* unprelight all other shortcuts */
+      thunar_shortcuts_view_foreach_group (view,
+                                           thunar_shortcuts_view_unprelight_shortcuts,
+                                           shortcut);
+    }
+}
+
+
+
+static void
+thunar_shortcuts_view_unselect_shortcuts (ThunarShortcutsView *view,
+                                          ThunarShortcutGroup *group,
+                                          gpointer             user_data)
+{
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_GROUP (group));
+
+  thunar_shortcut_group_unselect_shortcuts (group, THUNAR_SHORTCUT (user_data));
+}
+
+
+
+static void
+thunar_shortcuts_view_unprelight_shortcuts (ThunarShortcutsView *view,
+                                            ThunarShortcutGroup *group,
+                                            gpointer             user_data)
+{
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_GROUP (group));
+
+  thunar_shortcut_group_unprelight_shortcuts (group, THUNAR_SHORTCUT (user_data));
+}
+
+
+
+static void
+thunar_shortcuts_view_foreach_group (ThunarShortcutsView                *view,
+                                     ThunarShortcutsViewForeachGroupFunc func,
+                                     gpointer                            user_data)
+{
+  GList *children;
+  GList *iter;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
+
+  children = gtk_container_get_children (GTK_CONTAINER (view->group_box));
+
+  for (iter = children; iter != NULL; iter = iter->next)
+    (*func) (view, THUNAR_SHORTCUT_GROUP (iter->data), user_data);
+
+  g_list_free (children);
+}
+
+
+
+static void
+thunar_shortcuts_view_open (ThunarShortcutsView *view,
+                            ThunarFile          *file,
+                            gboolean             new_window)
+{
+  ThunarApplication *application;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
+  _thunar_return_if_fail (THUNAR_IS_FILE (file));
+
+  if (new_window)
+    {
+      /* open the file in a new window */
+      application = thunar_application_get ();
+      thunar_application_open_window (application, file,
+                                      gtk_widget_get_screen (GTK_WIDGET (view)),
+                                      NULL);
+      g_object_unref (application);
+    }
+  else
+    {
+      /* invoke the signal to change to the folder */
+      g_signal_emit (view, view_signals[SHORTCUT_ACTIVATED], 0, file);
+    }
 }
 
 

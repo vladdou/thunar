@@ -110,8 +110,6 @@ static gboolean     thunar_shortcut_focus                   (GtkWidget          
                                                              GtkDirectionType    direction);
 static gboolean     thunar_shortcut_focus_in_event          (GtkWidget          *widget,
                                                              GdkEventFocus      *event);
-static gboolean     thunar_shortcut_focus_out_event         (GtkWidget          *widget,
-                                                             GdkEventFocus      *event);
 static void         thunar_shortcut_size_request            (GtkWidget          *widget,
                                                              GtkRequisition     *requisition);
 static void         thunar_shortcut_button_state_changed    (ThunarShortcut     *shortcut,
@@ -242,7 +240,6 @@ thunar_shortcut_class_init (ThunarShortcutClass *klass)
   gtkwidget_class->expose_event = thunar_shortcut_expose_event;
   gtkwidget_class->focus = thunar_shortcut_focus;
   gtkwidget_class->focus_in_event = thunar_shortcut_focus_in_event;
-  gtkwidget_class->focus_out_event = thunar_shortcut_focus_out_event;
   gtkwidget_class->size_request = thunar_shortcut_size_request;
 
   g_object_class_install_property (gobject_class,
@@ -923,18 +920,6 @@ thunar_shortcut_focus_in_event (GtkWidget     *widget,
   _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT (widget), FALSE);
 
   gtk_widget_set_state (widget, GTK_STATE_SELECTED);
-  return TRUE;
-}
-
-
-
-static gboolean
-thunar_shortcut_focus_out_event (GtkWidget     *widget,
-                                 GdkEventFocus *event)
-{
-  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT (widget), FALSE);
-
-  gtk_widget_set_state (widget, GTK_STATE_NORMAL);
   return TRUE;
 }
 
