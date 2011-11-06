@@ -37,50 +37,53 @@ G_BEGIN_DECLS
 typedef struct _ThunarShortcutClass ThunarShortcutClass;
 typedef struct _ThunarShortcut      ThunarShortcut;
 
-GType              thunar_shortcut_get_type          (void) G_GNUC_CONST;
+GType              thunar_shortcut_get_type             (void) G_GNUC_CONST;
 
-GFile             *thunar_shortcut_get_location      (ThunarShortcut    *shortcut);
-void               thunar_shortcut_set_location      (ThunarShortcut    *shortcut,
-                                                      GFile             *location);
-ThunarFile        *thunar_shortcut_get_file          (ThunarShortcut    *shortcut);
-void               thunar_shortcut_set_file          (ThunarShortcut    *shortcut,
-                                                      ThunarFile        *file);
-GVolume           *thunar_shortcut_get_volume        (ThunarShortcut    *shortcut);
-void               thunar_shortcut_set_volume        (ThunarShortcut    *shortcut,
-                                                      GVolume           *volume);
-GMount            *thunar_shortcut_get_mount         (ThunarShortcut    *shortcut);
-void               thunar_shortcut_set_mount         (ThunarShortcut    *shortcut,
-                                                      GMount            *mount);
-GIcon             *thunar_shortcut_get_icon          (ThunarShortcut    *shortcut);
-void               thunar_shortcut_set_icon          (ThunarShortcut    *shortcut,
-                                                      GIcon             *icon);
-GIcon             *thunar_shortcut_get_custom_icon   (ThunarShortcut    *shortcut);
-void               thunar_shortcut_set_custom_icon   (ThunarShortcut    *shortcut,
-                                                      GIcon             *custom_icon);
-GIcon             *thunar_shortcut_get_eject_icon    (ThunarShortcut    *shortcut);
-void               thunar_shortcut_set_eject_icon    (ThunarShortcut    *shortcut,
-                                                      GIcon             *eject_icon);
-const gchar       *thunar_shortcut_get_name          (ThunarShortcut    *shortcut);
-void               thunar_shortcut_set_name          (ThunarShortcut    *shortcut,
-                                                      const gchar       *name);
-const gchar       *thunar_shortcut_get_custom_name   (ThunarShortcut    *shortcut);
-void               thunar_shortcut_set_custom_name   (ThunarShortcut    *shortcut,
-                                                      const gchar       *custom_name);
-ThunarShortcutType thunar_shortcut_get_shortcut_type (ThunarShortcut    *shortcut);
-void               thunar_shortcut_set_shortcut_type (ThunarShortcut    *shortcut,
-                                                      ThunarShortcutType shortcut_type);
-ThunarIconSize     thunar_shortcut_get_icon_size     (ThunarShortcut    *shortcut);
-void               thunar_shortcut_set_icon_size     (ThunarShortcut    *shortcut,
-                                                      ThunarIconSize     icon_size);
-gboolean           thunar_shortcut_get_hidden        (ThunarShortcut    *shortcut);
-void               thunar_shortcut_set_hidden        (ThunarShortcut    *shortcut,
-                                                      gboolean           hidden);
-gboolean           thunar_shortcut_get_mutable       (ThunarShortcut    *shortcut);
-void               thunar_shortcut_set_mutable       (ThunarShortcut    *shortcut,
-                                                      gboolean           mutable);
-gboolean           thunar_shortcut_get_persistent    (ThunarShortcut    *shortcut);
-void               thunar_shortcut_set_persistent    (ThunarShortcut    *shortcut,
-                                                      gboolean           persistent);
+GFile             *thunar_shortcut_get_location         (ThunarShortcut    *shortcut);
+void               thunar_shortcut_set_location         (ThunarShortcut    *shortcut,
+                                                         GFile             *location);
+ThunarFile        *thunar_shortcut_get_file             (ThunarShortcut    *shortcut);
+void               thunar_shortcut_set_file             (ThunarShortcut    *shortcut,
+                                                         ThunarFile        *file);
+GVolume           *thunar_shortcut_get_volume           (ThunarShortcut    *shortcut);
+void               thunar_shortcut_set_volume           (ThunarShortcut    *shortcut,
+                                                         GVolume           *volume);
+GMount            *thunar_shortcut_get_mount            (ThunarShortcut    *shortcut);
+void               thunar_shortcut_set_mount            (ThunarShortcut    *shortcut,
+                                                         GMount            *mount);
+GIcon             *thunar_shortcut_get_icon             (ThunarShortcut    *shortcut);
+void               thunar_shortcut_set_icon             (ThunarShortcut    *shortcut,
+                                                         GIcon             *icon);
+GIcon             *thunar_shortcut_get_custom_icon      (ThunarShortcut    *shortcut);
+void               thunar_shortcut_set_custom_icon      (ThunarShortcut    *shortcut,
+                                                         GIcon             *custom_icon);
+GIcon             *thunar_shortcut_get_eject_icon       (ThunarShortcut    *shortcut);
+void               thunar_shortcut_set_eject_icon       (ThunarShortcut    *shortcut,
+                                                         GIcon             *eject_icon);
+const gchar       *thunar_shortcut_get_name             (ThunarShortcut    *shortcut);
+void               thunar_shortcut_set_name             (ThunarShortcut    *shortcut,
+                                                         const gchar       *name);
+const gchar       *thunar_shortcut_get_custom_name      (ThunarShortcut    *shortcut);
+void               thunar_shortcut_set_custom_name      (ThunarShortcut    *shortcut,
+                                                         const gchar       *custom_name);
+ThunarShortcutType thunar_shortcut_get_shortcut_type    (ThunarShortcut    *shortcut);
+void               thunar_shortcut_set_shortcut_type    (ThunarShortcut    *shortcut,
+                                                         ThunarShortcutType shortcut_type);
+ThunarIconSize     thunar_shortcut_get_icon_size        (ThunarShortcut    *shortcut);
+void               thunar_shortcut_set_icon_size        (ThunarShortcut    *shortcut,
+                                                         ThunarIconSize     icon_size);
+gboolean           thunar_shortcut_get_hidden           (ThunarShortcut    *shortcut);
+void               thunar_shortcut_set_hidden           (ThunarShortcut    *shortcut,
+                                                         gboolean           hidden);
+gboolean           thunar_shortcut_get_mutable          (ThunarShortcut    *shortcut);
+void               thunar_shortcut_set_mutable          (ThunarShortcut    *shortcut,
+                                                         gboolean           mutable);
+gboolean           thunar_shortcut_get_persistent       (ThunarShortcut    *shortcut);
+void               thunar_shortcut_set_persistent       (ThunarShortcut    *shortcut,
+                                                         gboolean           persistent);
+void               thunar_shortcut_resolve_and_activate (ThunarShortcut *shortcut,
+                                                         gboolean        open_in_new_window);
+void               thunar_shortcut_disconnect           (ThunarShortcut    *shortcut);
 
 G_END_DECLS
 

@@ -27,10 +27,13 @@
 
 #include <gio/gio.h>
 
+#include <gdk/gdkkeysyms.h>
+
 #include <gtk/gtk.h>
 
 #include <thunar/thunar-browser.h>
 #include <thunar/thunar-enum-types.h>
+#include <thunar/thunar-dialogs.h>
 #include <thunar/thunar-file.h>
 #include <thunar/thunar-marshal.h>
 #include <thunar/thunar-preferences.h>
@@ -74,36 +77,90 @@ enum
 /* row states */
 typedef enum
 {
-  THUNAR_SHORTCUT_NORMAL,
-  THUNAR_SHORTCUT_RESOLVING,
-  THUNAR_SHORTCUT_EJECTING,
+  THUNAR_SHORTCUT_STATE_NORMAL,
+  THUNAR_SHORTCUT_STATE_RESOLVING,
+  THUNAR_SHORTCUT_STATE_EJECTING,
 } ThunarShortcutState;
 
 
 
-static void     thunar_shortcut_constructed             (GObject           *object);
-static void     thunar_shortcut_finalize                (GObject           *object);
-static void     thunar_shortcut_get_property            (GObject           *object,
-                                                         guint              prop_id,
-                                                         GValue            *value,
-                                                         GParamSpec        *pspec);
-static void     thunar_shortcut_set_property            (GObject           *object,
-                                                         guint              prop_id,
-                                                         const GValue      *value,
-                                                         GParamSpec        *pspec);
-static void     thunar_shortcut_size_request            (GtkWidget         *widget,
-                                                         GtkRequisition    *requisition);
-static gboolean thunar_shortcut_matches_types           (ThunarShortcut    *shortcut,
-                                                         ThunarShortcutType types);
-static void     thunar_shortcut_location_changed        (ThunarShortcut    *shortcut);
-static void     thunar_shortcut_file_changed            (ThunarShortcut    *shortcut);
-static void     thunar_shortcut_icon_changed            (ThunarShortcut    *shortcut);
-static void     thunar_shortcut_resolve_location_finish (ThunarBrowser     *browser,
-                                                         GFile             *location,
-                                                         ThunarFile        *file,
-                                                         ThunarFile        *target_file,
-                                                         GError            *error,
-                                                         gpointer           user_data);
+static void         thunar_shortcut_constructed             (GObject            *object);
+static void         thunar_shortcut_finalize                (GObject            *object);
+static void         thunar_shortcut_get_property            (GObject            *object,
+                                                             guint               prop_id,
+                                                             GValue             *value,
+                                                             GParamSpec         *pspec);
+static void         thunar_shortcut_set_property            (GObject            *object,
+                                                             guint               prop_id,
+                                                             const GValue       *value,
+                                                             GParamSpec         *pspec);
+static gboolean     thunar_shortcut_button_press_event      (GtkWidget          *widget,
+                                                             GdkEventButton     *event);
+static gboolean     thunar_shortcut_button_release_event    (GtkWidget          *widget,
+                                                             GdkEventButton     *event);
+static gboolean     thunar_shortcut_key_press_event         (GtkWidget          *widget,
+                                                             GdkEventKey        *event);
+static gboolean     thunar_shortcut_enter_notify_event      (GtkWidget          *widget,
+                                                             GdkEventCrossing   *event);
+static gboolean     thunar_shortcut_leave_notify_event      (GtkWidget          *widget,
+                                                             GdkEventCrossing   *event);
+static gboolean     thunar_shortcut_expose_event            (GtkWidget          *widget,
+                                                             GdkEventExpose     *event);
+static gboolean     thunar_shortcut_focus                   (GtkWidget          *widget,
+                                                             GtkDirectionType    direction);
+static gboolean     thunar_shortcut_focus_in_event          (GtkWidget          *widget,
+                                                             GdkEventFocus      *event);
+static gboolean     thunar_shortcut_focus_out_event         (GtkWidget          *widget,
+                                                             GdkEventFocus      *event);
+static void         thunar_shortcut_size_request            (GtkWidget          *widget,
+                                                             GtkRequisition     *requisition);
+static void         thunar_shortcut_button_state_changed    (ThunarShortcut     *shortcut,
+                                                             GtkStateType        previous_state,
+                                                             GtkWidget          *button);
+static void         thunar_shortcut_button_clicked          (ThunarShortcut     *shortcut,
+                                                             GtkButton          *button);
+static gboolean     thunar_shortcut_matches_types           (ThunarShortcut     *shortcut,
+                                                             ThunarShortcutType  types);
+static void         thunar_shortcut_location_changed        (ThunarShortcut     *shortcut);
+static void         thunar_shortcut_file_changed            (ThunarShortcut     *shortcut);
+static void         thunar_shortcut_shortcut_type_changed   (ThunarShortcut     *shortcut);
+static void         thunar_shortcut_icon_changed            (ThunarShortcut     *shortcut);
+static void         thunar_shortcut_resolve_location_finish (ThunarBrowser      *browser,
+                                                             GFile              *location,
+                                                             ThunarFile         *file,
+                                                             ThunarFile         *target_file,
+                                                             GError             *error,
+                                                             gpointer            user_data);
+static void         thunar_shortcut_mount_unmount_finish    (GObject            *object,
+                                                             GAsyncResult       *result,
+                                                             gpointer            user_data);
+static void         thunar_shortcut_mount_eject_finish      (GObject            *object,
+                                                             GAsyncResult       *result,
+                                                             gpointer            user_data);
+static void         thunar_shortcut_volume_eject_finish     (GObject            *object,
+                                                             GAsyncResult       *result,
+                                                             gpointer            user_data);
+static void         thunar_shortcut_poke_volume_finish      (ThunarBrowser      *browser,
+                                                             GVolume            *volume,
+                                                             ThunarFile         *file,
+                                                             GError             *error,
+                                                             gpointer            user_data);
+static void         thunar_shortcut_poke_file_finish        (ThunarBrowser      *browser,
+                                                             ThunarFile         *file,
+                                                             ThunarFile         *target_file,
+                                                             GError             *error,
+                                                             gpointer            user_data);
+static void         thunar_shortcut_poke_location_finish    (ThunarBrowser      *browser,
+                                                             GFile              *location,
+                                                             ThunarFile         *file,
+                                                             ThunarFile         *target_file,
+                                                             GError             *error,
+                                                             gpointer            user_data);
+static void         thunar_shortcut_set_spinning            (ThunarShortcut     *shortcut,
+                                                             gboolean            spinning,
+                                                             ThunarShortcutState new_state);
+static const gchar *thunar_shortcut_get_display_name        (ThunarShortcut     *shortcut);
+static GIcon       *thunar_shortcut_get_display_icon        (ThunarShortcut     *shortcut);
 
 
 
@@ -177,7 +234,6 @@ thunar_shortcut_class_init (ThunarShortcutClass *klass)
   gobject_class->set_property = thunar_shortcut_set_property;
 
   gtkwidget_class = GTK_WIDGET_CLASS (klass);
-#if 0
   gtkwidget_class->button_press_event = thunar_shortcut_button_press_event;
   gtkwidget_class->button_release_event = thunar_shortcut_button_release_event;
   gtkwidget_class->key_press_event = thunar_shortcut_key_press_event;
@@ -186,7 +242,7 @@ thunar_shortcut_class_init (ThunarShortcutClass *klass)
   gtkwidget_class->expose_event = thunar_shortcut_expose_event;
   gtkwidget_class->focus = thunar_shortcut_focus;
   gtkwidget_class->focus_in_event = thunar_shortcut_focus_in_event;
-#endif
+  gtkwidget_class->focus_out_event = thunar_shortcut_focus_out_event;
   gtkwidget_class->size_request = thunar_shortcut_size_request;
 
   g_object_class_install_property (gobject_class,
@@ -345,7 +401,7 @@ thunar_shortcut_init (ThunarShortcut *shortcut)
   shortcut->cancellable = g_cancellable_new ();
 
   /* set the shortcut state to normal */
-  shortcut->state = THUNAR_SHORTCUT_NORMAL;
+  shortcut->state = THUNAR_SHORTCUT_STATE_NORMAL;
 
   /* configure general widget behavior */
   gtk_widget_set_can_focus (GTK_WIDGET (shortcut), TRUE);
@@ -381,7 +437,6 @@ thunar_shortcut_init (ThunarShortcut *shortcut)
   gtk_box_pack_start (GTK_BOX (box), shortcut->action_button, FALSE, TRUE, 0);
   gtk_widget_hide (shortcut->action_button);
 
-#if 0
   /* adjust the state transitions of the button */
   g_signal_connect_swapped (shortcut->action_button, "state-changed",
                             G_CALLBACK (thunar_shortcut_button_state_changed), shortcut);
@@ -389,7 +444,6 @@ thunar_shortcut_init (ThunarShortcut *shortcut)
   /* react on button click events */
   g_signal_connect_swapped (shortcut->action_button, "clicked",
                             G_CALLBACK (thunar_shortcut_button_clicked), shortcut);
-#endif
 
   /* create the action button image */
   shortcut->action_image = gtk_image_new ();
@@ -625,6 +679,267 @@ thunar_shortcut_set_property (GObject      *object,
 
 
 
+static gboolean
+thunar_shortcut_button_press_event (GtkWidget      *widget,
+                                    GdkEventButton *event)
+{
+  GtkStateType state;
+
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT (widget), FALSE);
+
+  /* determine the widget's state */
+  state = gtk_widget_get_state (widget);
+
+  if (state == GTK_STATE_SELECTED)
+    {
+      if ((event->state & GDK_CONTROL_MASK) != 0)
+        gtk_widget_set_state (widget, GTK_STATE_NORMAL);
+    }
+  else
+    {
+      gtk_widget_set_state (widget, GTK_STATE_SELECTED);
+      gtk_widget_grab_focus (widget);
+    }
+
+  /* distinguish between left, right and middle click */
+  if (event->button == 1)
+    {
+      /* resolve (e.g. mount) the shortcut and activate it */
+      if (gtk_widget_get_state (widget) == GTK_STATE_SELECTED)
+        thunar_shortcut_resolve_and_activate (THUNAR_SHORTCUT (widget), FALSE);
+    }
+  else if (event->button == 3)
+    {
+      /* TODO start a context menu timeout */
+      g_debug ("right button press");
+    }
+  else if (event->button == 2)
+    {
+      /* TODO we don't handle middle-click events yet */
+      g_debug ("middle button press");
+    }
+
+  return TRUE;
+}
+
+
+
+static gboolean
+thunar_shortcut_button_release_event (GtkWidget      *widget,
+                                      GdkEventButton *event)
+{
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT (widget), FALSE);
+
+  /* distinguish between left, right and middle-click */
+  if (event->button == 3)
+    {
+      /* TODO abort the menu popup timeout created in reaction to 
+       * the right button press event */
+
+      /* emit the popup-menu signal */
+      g_signal_emit_by_name (widget, "context-menu");
+
+      return TRUE;
+    }
+  else
+    {
+      return FALSE;
+    }
+}
+
+
+
+static gboolean
+thunar_shortcut_key_press_event (GtkWidget   *widget,
+                                 GdkEventKey *event)
+{
+  gboolean new_window;
+
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT (widget), FALSE);
+
+  if (event->keyval == GDK_KEY_Return
+      || event->keyval == GDK_KEY_KP_Enter
+      || event->keyval == GDK_KEY_space
+      || event->keyval== GDK_KEY_KP_Space)
+    {
+      new_window = (event->state & GDK_CONTROL_MASK) != 0;
+      thunar_shortcut_resolve_and_activate (THUNAR_SHORTCUT (widget), new_window);
+      return TRUE;
+    }
+
+  return FALSE;
+}
+
+
+
+static gboolean
+thunar_shortcut_enter_notify_event (GtkWidget        *widget,
+                                    GdkEventCrossing *event)
+{
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT (widget), FALSE);
+
+  if (gtk_widget_get_state (widget) != GTK_STATE_SELECTED)
+    gtk_widget_set_state (widget, GTK_STATE_PRELIGHT);
+
+  return TRUE;
+}
+
+
+
+static gboolean
+thunar_shortcut_leave_notify_event (GtkWidget        *widget,
+                                    GdkEventCrossing *event)
+{
+  ThunarShortcut *shortcut = THUNAR_SHORTCUT (widget);
+  gint            x;
+  gint            y;
+  gint            width;
+  gint            height;
+
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT (widget), FALSE);
+
+  /* check whether the shortcut is hovered but not selected */
+  if (gtk_widget_get_state (widget) == GTK_STATE_PRELIGHT)
+    {
+      /* determine the location of the pointer relative to the action button */
+      gtk_widget_get_pointer (shortcut->action_button, &x, &y);
+
+      /* determine the geometry of the button window */
+      gdk_window_get_geometry (gtk_widget_get_window (shortcut->action_button),
+                               NULL, NULL, &width, &height, NULL);
+
+      /* the pointer has left the shortcut widget itself but we only
+       * reset the prelight state if the mouse is not hovering
+       * the button either */
+      if (x <= 0 || y <= 0 || x >= width || y >= height)
+        gtk_widget_set_state (widget, GTK_STATE_NORMAL);
+    }
+
+  return TRUE;
+}
+
+
+
+static gboolean
+thunar_shortcut_expose_event (GtkWidget      *widget,
+                              GdkEventExpose *event)
+{
+  GtkStateType state;
+  GList       *children;
+  GList       *lp;
+
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT (widget), FALSE);
+
+  /* determine the widget state */
+  state = gtk_widget_get_state (widget);
+
+  /* paint a flat box that gives the shortcut the same look as a
+   * tree view row */
+  gtk_paint_flat_box (gtk_widget_get_style (widget),
+                      event->window,
+                      state,
+                      GTK_SHADOW_NONE,
+                      &event->area,
+                      widget,
+                      "cell_even_middle",
+                      event->area.x,
+                      event->area.y,
+                      event->area.width,
+                      event->area.height);
+
+  /* propagate the expose event to all children */
+  children = gtk_container_get_children (GTK_CONTAINER (widget));
+  for (lp = children; lp != NULL; lp = lp->next)
+    gtk_container_propagate_expose (GTK_CONTAINER (widget), lp->data, event);
+  g_list_free (children);
+
+  return FALSE;
+}
+
+
+
+static gboolean
+thunar_shortcut_focus (GtkWidget       *widget,
+                       GtkDirectionType direction)
+{
+  ThunarShortcut *shortcut = THUNAR_SHORTCUT (widget);
+
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT (widget), FALSE);
+
+  switch (direction)
+    {
+    case GTK_DIR_TAB_FORWARD:
+    case GTK_DIR_TAB_BACKWARD:
+      return FALSE;
+
+    case GTK_DIR_UP:
+      if (gtk_widget_is_focus (widget) || gtk_widget_is_focus (shortcut->action_button))
+        {
+          return FALSE;
+        }
+      else
+        {
+          gtk_widget_grab_focus (widget);
+          return TRUE;
+        }
+
+    case GTK_DIR_DOWN:
+      if (gtk_widget_is_focus (widget) || gtk_widget_is_focus (shortcut->action_button))
+        {
+          return FALSE;
+        }
+      else
+        {
+          gtk_widget_grab_focus (widget);
+          return TRUE;
+        }
+
+    case GTK_DIR_LEFT:
+      gtk_widget_grab_focus (widget);
+      return TRUE;
+
+    case GTK_DIR_RIGHT:
+      if (gtk_widget_get_visible (shortcut->action_button))
+        {
+          gtk_widget_grab_focus (shortcut->action_button);
+          return TRUE;
+        }
+      else
+        {
+          return FALSE;
+        }
+
+    default:
+      return FALSE;
+    }
+}
+
+
+
+static gboolean
+thunar_shortcut_focus_in_event (GtkWidget     *widget,
+                                GdkEventFocus *event)
+{
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT (widget), FALSE);
+
+  gtk_widget_set_state (widget, GTK_STATE_SELECTED);
+  return TRUE;
+}
+
+
+
+static gboolean
+thunar_shortcut_focus_out_event (GtkWidget     *widget,
+                                 GdkEventFocus *event)
+{
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT (widget), FALSE);
+
+  gtk_widget_set_state (widget, GTK_STATE_NORMAL);
+  return TRUE;
+}
+
+
+
 static void
 thunar_shortcut_size_request (GtkWidget      *widget,
                               GtkRequisition *requisition)
@@ -641,10 +956,59 @@ thunar_shortcut_size_request (GtkWidget      *widget,
   gtk_widget_size_request (shortcut->action_button, &button_requisition);
 
   /* use the maximum of the computed requisition height, the button height,
-   * the icon size + 4, and the minimum allowed height for rows */
+   * the icon size + 4, and the minimum allowed height for shortcuts */
   requisition->height = MAX (requisition->height, button_requisition.height);
   requisition->height = MAX (requisition->height, (gint) shortcut->icon_size + 4);
   requisition->height = MAX (requisition->height, THUNAR_SHORTCUT_MIN_HEIGHT);
+}
+
+
+
+static void
+thunar_shortcut_button_state_changed (ThunarShortcut *shortcut,
+                                      GtkStateType    previous_state,
+                                      GtkWidget      *button)
+{
+  gint x;
+  gint y;
+  gint width;
+  gint height;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
+
+  if (gtk_widget_get_state (shortcut->action_button) == GTK_STATE_PRELIGHT
+      && gtk_widget_get_state (GTK_WIDGET (shortcut)) == GTK_STATE_PRELIGHT)
+    {
+      gtk_widget_get_pointer (shortcut->action_button, &x, &y);
+
+      gdk_window_get_geometry (gtk_widget_get_window (shortcut->action_button),
+                               NULL, NULL, &width, &height, NULL);
+
+      if (x <= 0 || y <= 0 || x >= width || y >= height)
+        gtk_widget_set_state (shortcut->action_button, GTK_STATE_NORMAL);
+    }
+}
+
+
+
+static void
+thunar_shortcut_button_clicked (ThunarShortcut *shortcut,
+                                GtkButton      *button)
+{
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
+
+  /* check if we are currently mounting/ejecting something */
+  if (shortcut->state != THUNAR_SHORTCUT_STATE_NORMAL)
+    {
+      /* abort the mount/eject process */
+      g_cancellable_cancel (shortcut->cancellable);
+
+      /* we're done, no further processing please */
+      return;
+    }
+
+  /* disconnect the shortcut */
+  thunar_shortcut_disconnect (shortcut);
 }
 
 
@@ -671,7 +1035,8 @@ thunar_shortcut_location_changed (ThunarShortcut *shortcut)
   /* only update the shortcut if this is a file shortcut */
   if (!thunar_shortcut_matches_types (shortcut, 
                                       THUNAR_SHORTCUT_REGULAR_FILE
-                                      | THUNAR_SHORTCUT_NETWORK_FILE))
+                                      | THUNAR_SHORTCUT_NETWORK_FILE
+                                      | THUNAR_SHORTCUT_TRASH_FILE))
     {
       return;
     }
@@ -705,7 +1070,7 @@ thunar_shortcut_location_changed (ThunarShortcut *shortcut)
     {
       /* if this is reached, there is something wrong with the
        * shortcut classification */
-      _thunar_assert_not_reached ();
+      _thunar_assert (!shortcut->constructed);
     }
 }
 
@@ -750,9 +1115,7 @@ thunar_shortcut_name_changed (ThunarShortcut *shortcut)
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
 
   /* get the name (custom name overrides the regular name) */
-  name = thunar_shortcut_get_custom_name (shortcut);
-  if (name == NULL)
-    name = thunar_shortcut_get_name (shortcut);
+  name = thunar_shortcut_get_display_name (shortcut);
 
   /* update the label widget */
   gtk_label_set_text (GTK_LABEL (shortcut->label_widget), name);
@@ -794,7 +1157,7 @@ thunar_shortcut_volume_changed (ThunarShortcut *shortcut)
     {
       /* if this is reached, there is something wrong the 
        * shortcut classification */
-      _thunar_assert_not_reached ();
+      _thunar_assert(!shortcut->constructed);
     }
 }
 
@@ -840,7 +1203,40 @@ thunar_shortcut_mount_changed (ThunarShortcut *shortcut)
     {
       /* if this is reached, there is something wrong the 
        * shortcut classification */
+      _thunar_assert (!shortcut->constructed);
+    }
+}
+
+
+
+static void
+thunar_shortcut_shortcut_type_changed (ThunarShortcut *shortcut)
+{
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
+
+  /* update the shortcut depending on the type */
+  switch (shortcut->type)
+    {
+    case THUNAR_SHORTCUT_REGULAR_FILE:
+    case THUNAR_SHORTCUT_NETWORK_FILE:
+    case THUNAR_SHORTCUT_TRASH_FILE:
+      thunar_shortcut_location_changed (shortcut);
+      break;
+
+    case THUNAR_SHORTCUT_REGULAR_MOUNT:
+    case THUNAR_SHORTCUT_ARCHIVE_MOUNT:
+    case THUNAR_SHORTCUT_NETWORK_MOUNT:
+      thunar_shortcut_mount_changed (shortcut);
+      break;
+
+    case THUNAR_SHORTCUT_EJECTABLE_VOLUME:
+    case THUNAR_SHORTCUT_REGULAR_VOLUME:
+      thunar_shortcut_volume_changed (shortcut);
+      break;
+
+    default:
       _thunar_assert_not_reached ();
+      break;
     }
 }
 
@@ -854,9 +1250,7 @@ thunar_shortcut_icon_changed (ThunarShortcut *shortcut)
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
 
   /* get the icon (custom icon overrides the regular icon) */
-  icon = thunar_shortcut_get_custom_icon (shortcut);
-  if (icon == NULL)
-    icon = thunar_shortcut_get_icon (shortcut);
+  icon = thunar_shortcut_get_display_icon (shortcut);
 
   /* update the icon image */
   gtk_image_set_from_gicon (GTK_IMAGE (shortcut->icon_image), icon, shortcut->icon_size);
@@ -909,6 +1303,261 @@ thunar_shortcut_resolve_location_finish (ThunarBrowser *browser,
 
   /* assign the file to the shortcut */
   thunar_shortcut_set_file (shortcut, target_file);
+}
+
+
+
+static void
+thunar_shortcut_mount_unmount_finish (GObject      *object,
+                                      GAsyncResult *result,
+                                      gpointer      user_data)
+{
+  ThunarShortcut *shortcut = THUNAR_SHORTCUT (user_data);
+  const gchar    *name;
+  GMount         *mount = G_MOUNT (object);
+  GError         *error = NULL;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
+  _thunar_return_if_fail (G_IS_MOUNT (mount));
+  _thunar_return_if_fail (G_IS_ASYNC_RESULT (result));
+
+  /* stop spinning */
+  thunar_shortcut_set_spinning (shortcut, FALSE, THUNAR_SHORTCUT_STATE_NORMAL);
+
+  if (!g_mount_unmount_with_operation_finish (mount, result, &error))
+    {
+      name = thunar_shortcut_get_display_name (shortcut);
+      thunar_dialogs_show_error (GTK_WIDGET (shortcut), error,
+                                 _("Failed to eject \"%s\""), name);
+      g_error_free (error);
+    }
+}
+
+
+
+static void
+thunar_shortcut_mount_eject_finish (GObject      *object,
+                                    GAsyncResult *result,
+                                    gpointer      user_data)
+{
+  ThunarShortcut *shortcut = THUNAR_SHORTCUT (user_data);
+  const gchar    *name;
+  GMount         *mount = G_MOUNT (object);
+  GError         *error = NULL;
+
+  /* stop spinning */
+  thunar_shortcut_set_spinning (shortcut, FALSE, THUNAR_SHORTCUT_STATE_NORMAL);
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
+  _thunar_return_if_fail (G_IS_MOUNT (mount));
+  _thunar_return_if_fail (G_IS_ASYNC_RESULT (result));
+
+  if (!g_mount_eject_with_operation_finish (mount, result, &error))
+    {
+      name = thunar_shortcut_get_display_name (shortcut);
+      thunar_dialogs_show_error (GTK_WIDGET (shortcut), error,
+                                 _("Failed to eject \"%s\""), name);
+      g_error_free (error);
+    }
+}
+
+
+
+static void
+thunar_shortcut_volume_eject_finish (GObject      *object,
+                                     GAsyncResult *result,
+                                     gpointer      user_data)
+{
+  ThunarShortcut *shortcut = THUNAR_SHORTCUT (user_data);
+  const gchar    *name;
+  GVolume        *volume = G_VOLUME (object);
+  GError         *error = NULL;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
+  _thunar_return_if_fail (G_IS_VOLUME (volume));
+  _thunar_return_if_fail (G_IS_ASYNC_RESULT (result));
+
+  /* stop spinning */
+  thunar_shortcut_set_spinning (shortcut, FALSE, THUNAR_SHORTCUT_STATE_NORMAL);
+
+  if (!g_volume_eject_with_operation_finish (volume, result, &error))
+    {
+      name = thunar_shortcut_get_display_name (shortcut);
+      thunar_dialogs_show_error (GTK_WIDGET (shortcut), error,
+                                 _("Failed to eject \"%s\""), name);
+      g_error_free (error);
+    }
+}
+
+
+
+static void
+thunar_shortcut_poke_volume_finish (ThunarBrowser *browser,
+                                    GVolume       *volume,
+                                    ThunarFile    *file,
+                                    GError        *error,
+                                    gpointer       user_data)
+{
+  ThunarShortcut *shortcut = THUNAR_SHORTCUT (browser);
+  const gchar    *name;
+  gboolean        open_in_new_window = GPOINTER_TO_UINT (user_data);
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT (browser));
+  _thunar_return_if_fail (G_IS_VOLUME (volume));
+  _thunar_return_if_fail (file == NULL || THUNAR_IS_FILE (file));
+
+  /* deactivate the spinner */
+  thunar_shortcut_set_spinning (shortcut, FALSE, THUNAR_SHORTCUT_STATE_NORMAL);
+
+  if (error == NULL)
+    {
+      g_signal_emit (shortcut, shortcut_signals[SIGNAL_ACTIVATED], 0, file,
+                     open_in_new_window);
+    }
+  else
+    {
+      name = thunar_shortcut_get_display_name (shortcut);
+      thunar_dialogs_show_error (GTK_WIDGET (shortcut), error,
+                                 _("Failed to open \"%s\""), name);
+    }
+}
+
+
+
+static void
+thunar_shortcut_poke_file_finish (ThunarBrowser *browser,
+                                  ThunarFile    *file,
+                                  ThunarFile    *target_file,
+                                  GError        *error,
+                                  gpointer       user_data)
+{
+  ThunarShortcut *shortcut = THUNAR_SHORTCUT (browser);
+  const gchar    *name;
+  gboolean        open_in_new_window = GPOINTER_TO_UINT (user_data);
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT (browser));
+  _thunar_return_if_fail (THUNAR_IS_FILE (file));
+  _thunar_return_if_fail (target_file == NULL || THUNAR_IS_FILE (target_file));
+
+  /* deactivate the spinner */
+  thunar_shortcut_set_spinning (shortcut, FALSE, THUNAR_SHORTCUT_STATE_NORMAL);
+
+  if (error == NULL)
+    {
+      g_signal_emit (shortcut, shortcut_signals[SIGNAL_ACTIVATED], 0, target_file, 
+                     open_in_new_window);
+    }
+  else
+    {
+      name = thunar_shortcut_get_display_name (shortcut);
+      thunar_dialogs_show_error (GTK_WIDGET (shortcut), error,
+                                 _("Failed to open \"%s\""), name);
+    }
+}
+
+
+
+static void
+thunar_shortcut_poke_location_finish (ThunarBrowser *browser,
+                                      GFile         *location,
+                                      ThunarFile    *file,
+                                      ThunarFile    *target_file,
+                                      GError        *error,
+                                      gpointer       user_data)
+{
+  ThunarShortcut *shortcut = THUNAR_SHORTCUT (browser);
+  const gchar    *name;
+  gboolean        open_in_new_window = GPOINTER_TO_UINT (user_data);
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT (browser));
+  _thunar_return_if_fail (G_IS_FILE (location));
+  _thunar_return_if_fail (file == NULL || THUNAR_IS_FILE (file));
+  _thunar_return_if_fail (target_file == NULL || THUNAR_IS_FILE (target_file));
+
+  /* deactivate the spinner */
+  thunar_shortcut_set_spinning (shortcut, FALSE, THUNAR_SHORTCUT_STATE_NORMAL);
+
+  if (error == NULL)
+    {
+      g_signal_emit (shortcut, shortcut_signals[SIGNAL_ACTIVATED], 0, target_file, 
+                     open_in_new_window);
+    }
+  else
+    {
+      name = thunar_shortcut_get_display_name (shortcut);
+      thunar_dialogs_show_error (GTK_WIDGET (shortcut), error,
+                                 _("Failed to open \"%s\""), name);
+    }
+}
+
+
+
+static void
+thunar_shortcut_set_spinning (ThunarShortcut     *shortcut,
+                              gboolean            spinning,
+                              ThunarShortcutState new_state)
+{
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
+
+  /* apply the new state */
+  shortcut->state = new_state;
+
+  /* reset the cancelable so that we can use it to cancel the process */
+  g_cancellable_reset (shortcut->cancellable);
+
+  if (spinning)
+    {
+      gtk_button_set_image (GTK_BUTTON (shortcut->action_button), shortcut->spinner);
+      gtk_spinner_start (GTK_SPINNER (shortcut->spinner));
+      gtk_widget_show (shortcut->spinner);
+      gtk_widget_show (shortcut->action_button);
+    }
+  else
+    {
+      gtk_button_set_image (GTK_BUTTON (shortcut->action_button),
+                            shortcut->action_image);
+      gtk_spinner_stop (GTK_SPINNER (shortcut->spinner));
+      gtk_widget_hide (shortcut->spinner);
+      gtk_widget_hide (shortcut->action_button);
+
+      /* assume the mount and volume have changed which will make 
+       * the action button visible again if the volume or mount is 
+       * mounted and can be ejected */
+      thunar_shortcut_mount_changed (shortcut);
+      thunar_shortcut_volume_changed (shortcut);
+    }
+}
+
+
+
+static const gchar *
+thunar_shortcut_get_display_name (ThunarShortcut *shortcut)
+{
+  const gchar *label;
+
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT (shortcut), NULL);
+  
+  label = thunar_shortcut_get_custom_name (shortcut);
+  if (label == NULL)
+    label = thunar_shortcut_get_name (shortcut);
+
+  return label;
+}
+
+
+
+static GIcon *
+thunar_shortcut_get_display_icon (ThunarShortcut *shortcut)
+{
+  GIcon *icon;
+
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT (shortcut), NULL);
+
+  icon = thunar_shortcut_get_custom_icon (shortcut);
+  if (icon == NULL)
+    icon = thunar_shortcut_get_icon (shortcut);
+
+  return icon;
 }
 
 
@@ -1254,6 +1903,8 @@ thunar_shortcut_set_shortcut_type (ThunarShortcut    *shortcut,
 
   shortcut->type = shortcut_type;
 
+  thunar_shortcut_shortcut_type_changed (shortcut);
+
   g_object_notify (G_OBJECT (shortcut), "shortcut-type");
 }
 
@@ -1359,4 +2010,182 @@ thunar_shortcut_set_persistent (ThunarShortcut *shortcut,
   shortcut->persistent = persistent;
 
   g_object_notify (G_OBJECT (shortcut), "persistent");
+}
+
+
+
+void
+thunar_shortcut_resolve_and_activate (ThunarShortcut *shortcut,
+                                      gboolean        open_in_new_window)
+{
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
+
+  /* check if we are currently mounting/ejecting something */
+  if (shortcut->state != THUNAR_SHORTCUT_STATE_NORMAL)
+    {
+      /* abort the current mount/eject process */
+      g_cancellable_cancel (shortcut->cancellable);
+      g_cancellable_reset (shortcut->cancellable);
+    }
+
+  if (shortcut->volume != NULL)
+    {
+      /* activate the spinner */
+      thunar_shortcut_set_spinning (shortcut, TRUE, THUNAR_SHORTCUT_STATE_RESOLVING);
+
+      thunar_browser_poke_volume (THUNAR_BROWSER (shortcut), shortcut->volume,
+                                  shortcut, thunar_shortcut_poke_volume_finish,
+                                  GUINT_TO_POINTER (open_in_new_window));
+    }
+  else if (shortcut->file != NULL)
+    {
+      /* activate the spinner */
+      thunar_shortcut_set_spinning (shortcut, TRUE, THUNAR_SHORTCUT_STATE_RESOLVING);
+
+      thunar_browser_poke_file (THUNAR_BROWSER (shortcut), shortcut->file,
+                                shortcut, thunar_shortcut_poke_file_finish,
+                                GUINT_TO_POINTER (open_in_new_window));
+    }
+  else if (shortcut->location != NULL)
+    {
+      /* activate the spinner */
+      thunar_shortcut_set_spinning (shortcut, TRUE, THUNAR_SHORTCUT_STATE_RESOLVING);
+
+      thunar_browser_poke_location (THUNAR_BROWSER (shortcut), shortcut->location,
+                                    shortcut, thunar_shortcut_poke_location_finish,
+                                    GUINT_TO_POINTER (open_in_new_window));
+    }
+  else
+    {
+      _thunar_assert_not_reached ();
+    }
+}
+
+
+
+void
+thunar_shortcut_disconnect (ThunarShortcut *shortcut)
+{
+  GMountOperation *mount_operation;
+  GtkWidget       *toplevel;
+  GMount          *mount;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
+
+  g_debug ("disconnect shortcut");
+
+  /* check if we are currently mounting/ejecting something */
+  if (shortcut->state != THUNAR_SHORTCUT_STATE_NORMAL)
+    {
+      /* abort the current mount/eject process */
+      g_cancellable_cancel (shortcut->cancellable);
+      g_cancellable_reset (shortcut->cancellable);
+    }
+
+  /* create a mount operation */
+  toplevel = gtk_widget_get_toplevel (GTK_WIDGET (shortcut));
+  mount_operation = gtk_mount_operation_new (GTK_WINDOW (toplevel));
+  gtk_mount_operation_set_screen (GTK_MOUNT_OPERATION (mount_operation),
+                                  gtk_widget_get_screen (GTK_WIDGET (shortcut)));
+
+  if (shortcut->mount != NULL)
+    {
+      g_debug ("  have mount");
+
+      /* distinguish between ejectable and unmountable mounts */
+      if (g_mount_can_eject (shortcut->mount))
+        {
+          g_debug ("  can eject");
+
+          /* start spinning */
+          thunar_shortcut_set_spinning (shortcut, TRUE, THUNAR_SHORTCUT_STATE_EJECTING);
+
+          g_debug ("  eject now");
+
+          /* try ejecting the mount */
+          g_mount_eject_with_operation (shortcut->mount,
+                                        G_MOUNT_UNMOUNT_NONE,
+                                        mount_operation,
+                                        shortcut->cancellable,
+                                        thunar_shortcut_mount_eject_finish,
+                                        shortcut);
+        }
+      else if (g_mount_can_unmount (shortcut->mount))
+        {
+          /* start spinning */
+          thunar_shortcut_set_spinning (shortcut, TRUE, THUNAR_SHORTCUT_STATE_EJECTING);
+
+          /* try unmounting the mount */
+          g_mount_unmount_with_operation (shortcut->mount,
+                                          G_MOUNT_UNMOUNT_NONE,
+                                          mount_operation,
+                                          shortcut->cancellable,
+                                          thunar_shortcut_mount_unmount_finish,
+                                          shortcut);
+        }
+    }
+  else if (shortcut->volume != NULL)
+    {
+      if (g_volume_can_eject (shortcut->volume))
+        {
+          /* start spinning */
+          thunar_shortcut_set_spinning (shortcut, TRUE, THUNAR_SHORTCUT_STATE_EJECTING);
+
+          /* try ejecting the volume */
+          g_volume_eject_with_operation (shortcut->volume,
+                                         G_MOUNT_UNMOUNT_NONE,
+                                         mount_operation,
+                                         shortcut->cancellable,
+                                         thunar_shortcut_volume_eject_finish,
+                                         shortcut);
+        }
+      else
+        {
+          mount = g_volume_get_mount (shortcut->volume);
+          if (mount != NULL)
+            {
+              /* distinguish between ejectable and unmountable mounts */
+              if (g_mount_can_eject (mount))
+                {
+                  /* start spinning */
+                  thunar_shortcut_set_spinning (shortcut, TRUE, 
+                                                THUNAR_SHORTCUT_STATE_EJECTING);
+
+                  /* try unmounting the mount */
+                  g_mount_unmount_with_operation (mount,
+                                                  G_MOUNT_UNMOUNT_NONE,
+                                                  mount_operation,
+                                                  shortcut->cancellable,
+                                                  thunar_shortcut_mount_unmount_finish,
+                                                  shortcut);
+                }
+              else if (g_mount_can_unmount (mount))
+                {
+                  /* start spinning */
+                  thunar_shortcut_set_spinning (shortcut, TRUE, 
+                                                THUNAR_SHORTCUT_STATE_EJECTING);
+
+                  /* try unmounting the mount */
+                  g_mount_unmount_with_operation (mount,
+                                                  G_MOUNT_UNMOUNT_NONE,
+                                                  mount_operation,
+                                                  shortcut->cancellable,
+                                                  thunar_shortcut_mount_unmount_finish,
+                                                  shortcut);
+                }
+
+              /* release the mount */
+              g_object_unref (mount);
+            }
+        }
+    }
+  else
+    {
+      /* this method was called despite no mount or volume being available
+       * for this shortcut... that should not happen */
+      _thunar_assert_not_reached ();
+    }
+
+  /* release the mount operation */
+  g_object_unref (mount_operation);
 }
