@@ -74,12 +74,6 @@ enum
 
 
 
-typedef void (*ThunarShortcutsViewForeachGroupFunc) (ThunarShortcutsView *view,
-                                                     ThunarShortcutGroup *group,
-                                                     gpointer             user_data);
-
-
-
 static void               thunar_shortcuts_view_constructed              (GObject                            *object);
 static void               thunar_shortcuts_view_finalize                 (GObject                            *object);
 static void               thunar_shortcuts_view_get_property             (GObject                            *object,
@@ -107,15 +101,9 @@ static void               thunar_shortcuts_view_mount_added              (Thunar
 static void               thunar_shortcuts_view_volume_removed           (ThunarShortcutsView                *view,
                                                                           GVolume                            *volume,
                                                                           GVolumeMonitor                     *monitor);
-static void               thunar_shortcuts_view_remove_volume_shortcut   (ThunarShortcutsView                *view,
-                                                                          ThunarShortcutGroup                *group,
-                                                                          gpointer                            user_data);
 static void               thunar_shortcuts_view_mount_removed            (ThunarShortcutsView                *view,
                                                                           GMount                             *mount,
                                                                           GVolumeMonitor                     *monitor);
-static void               thunar_shortcuts_view_remove_mount_shortcut    (ThunarShortcutsView                *view,
-                                                                          ThunarShortcutGroup                *group,
-                                                                          gpointer                            user_data);
 static void               thunar_shortcuts_view_add_shortcut             (ThunarShortcutsView                *view,
                                                                           ThunarShortcut                     *shortcut);
 static void               thunar_shortcuts_view_shortcut_activated       (ThunarShortcutsView                *view,
@@ -126,14 +114,9 @@ static void               thunar_shortcuts_view_shortcut_state_changed   (Thunar
                                                                           GtkStateType                        previous_state,
                                                                           ThunarShortcut                     *shortcut);
 static void               thunar_shortcuts_view_unselect_shortcuts       (ThunarShortcutsView                *view,
-                                                                          ThunarShortcutGroup                *group,
-                                                                          gpointer                            user_data);
+                                                                          ThunarShortcut                     *exception);
 static void               thunar_shortcuts_view_unprelight_shortcuts     (ThunarShortcutsView                *view,
-                                                                          ThunarShortcutGroup                *group,
-                                                                          gpointer                            user_data);
-static void               thunar_shortcuts_view_foreach_group            (ThunarShortcutsView                *view,
-                                                                          ThunarShortcutsViewForeachGroupFunc func,
-                                                                          gpointer                            user_data);
+                                                                          ThunarShortcut                     *shortcut);
 static void               thunar_shortcuts_view_open                     (ThunarShortcutsView                *view,
                                                                           ThunarFile                         *file,
                                                                           gboolean                            new_window);
@@ -149,9 +132,6 @@ static void               thunar_shortcuts_view_shortcut_unmount         (Thunar
                                                                           GtkMenuItem                        *item);
 static gboolean           thunar_shortcuts_view_shortcut_context_menu    (ThunarShortcutsView              *view,
                                                                           GtkWidget                        *widget);
-static void               thunar_shortcuts_view_update_selection         (ThunarShortcutsView              *view,
-                                                                          ThunarShortcutGroup              *group,
-                                                                          gpointer                          user_data);
 
 
 
@@ -779,29 +759,19 @@ thunar_shortcuts_view_volume_removed (ThunarShortcutsView *view,
                                       GVolume             *volume,
                                       GVolumeMonitor      *monitor)
 {
+  GList *children;
+  GList *iter;
+
   _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
   _thunar_return_if_fail (G_IS_VOLUME (volume));
   _thunar_return_if_fail (G_IS_VOLUME_MONITOR (monitor));
 
-  thunar_shortcuts_view_foreach_group (view,
-                                       thunar_shortcuts_view_remove_volume_shortcut,
-                                       volume);
-}
+  children = gtk_container_get_children (GTK_CONTAINER (view->group_box));
 
+  for (iter = children; iter != NULL; iter = iter->next)
+    thunar_shortcut_group_remove_volume_shortcut (iter->data, volume);
 
-
-static void
-thunar_shortcuts_view_remove_volume_shortcut (ThunarShortcutsView *view,
-                                              ThunarShortcutGroup *group,
-                                              gpointer             user_data)
-{
-  GVolume *volume = G_VOLUME (user_data);
-
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_GROUP (group));
-  _thunar_return_if_fail (G_IS_VOLUME (volume));
-
-  thunar_shortcut_group_remove_volume_shortcut (group, volume);
+  g_list_free (children);
 }
 
 
@@ -869,29 +839,19 @@ thunar_shortcuts_view_mount_removed (ThunarShortcutsView *view,
                                      GMount              *mount,
                                      GVolumeMonitor      *monitor)
 {
+  GList *children;
+  GList *iter;
+
   _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
   _thunar_return_if_fail (G_IS_MOUNT (mount));
   _thunar_return_if_fail (G_IS_VOLUME_MONITOR (monitor));
 
-  thunar_shortcuts_view_foreach_group (view,
-                                       thunar_shortcuts_view_remove_mount_shortcut,
-                                       mount);
-}
+  children = gtk_container_get_children (GTK_CONTAINER (view->group_box));
 
+  for (iter = children; iter != NULL; iter = iter->next)
+    thunar_shortcut_group_remove_mount_shortcut (iter->data, mount);
 
-
-static void
-thunar_shortcuts_view_remove_mount_shortcut (ThunarShortcutsView *view,
-                                             ThunarShortcutGroup *group,
-                                             gpointer             user_data)
-{
-  GMount *mount = G_MOUNT (user_data);
-
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_GROUP (group));
-  _thunar_return_if_fail (G_IS_MOUNT (mount));
-
-  thunar_shortcut_group_remove_mount_shortcut (group, mount);
+  g_list_free (children);
 }
 
 
@@ -974,16 +934,12 @@ thunar_shortcuts_view_shortcut_state_changed (ThunarShortcutsView *view,
   if (gtk_widget_get_state (GTK_WIDGET (shortcut)) == GTK_STATE_SELECTED)
     {
       /* unselect all other shortcuts */
-      thunar_shortcuts_view_foreach_group (view,
-                                           thunar_shortcuts_view_unselect_shortcuts,
-                                           shortcut);
+      thunar_shortcuts_view_unselect_shortcuts (view, shortcut);
     }
   else if (gtk_widget_get_state (GTK_WIDGET (shortcut)) == GTK_STATE_PRELIGHT)
     {
       /* unprelight all other shortcuts */
-      thunar_shortcuts_view_foreach_group (view,
-                                           thunar_shortcuts_view_unprelight_shortcuts,
-                                           shortcut);
+      thunar_shortcuts_view_unprelight_shortcuts (view, shortcut);
     }
 }
 
@@ -991,44 +947,38 @@ thunar_shortcuts_view_shortcut_state_changed (ThunarShortcutsView *view,
 
 static void
 thunar_shortcuts_view_unselect_shortcuts (ThunarShortcutsView *view,
-                                          ThunarShortcutGroup *group,
-                                          gpointer             user_data)
+                                          ThunarShortcut      *exception)
 {
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_GROUP (group));
+  GList *children;
+  GList *iter;
 
-  thunar_shortcut_group_unselect_shortcuts (group, THUNAR_SHORTCUT (user_data));
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT (exception));
+
+  children = gtk_container_get_children (GTK_CONTAINER (view->group_box));
+
+  for (iter = children; iter != NULL; iter = iter->next)
+    thunar_shortcut_group_unselect_shortcuts (iter->data, exception);
+
+  g_list_free (children);
 }
 
 
 
 static void
 thunar_shortcuts_view_unprelight_shortcuts (ThunarShortcutsView *view,
-                                            ThunarShortcutGroup *group,
-                                            gpointer             user_data)
-{
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_GROUP (group));
-
-  thunar_shortcut_group_unprelight_shortcuts (group, THUNAR_SHORTCUT (user_data));
-}
-
-
-
-static void
-thunar_shortcuts_view_foreach_group (ThunarShortcutsView                *view,
-                                     ThunarShortcutsViewForeachGroupFunc func,
-                                     gpointer                            user_data)
+                                            ThunarShortcut      *exception)
 {
   GList *children;
   GList *iter;
 
   _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT (exception));
 
   children = gtk_container_get_children (GTK_CONTAINER (view->group_box));
 
   for (iter = children; iter != NULL; iter = iter->next)
-    (*func) (view, THUNAR_SHORTCUT_GROUP (iter->data), user_data);
+    thunar_shortcut_group_unprelight_shortcuts (iter->data, exception);
 
   g_list_free (children);
 }
@@ -1370,22 +1320,6 @@ thunar_shortcuts_view_shortcut_context_menu (ThunarShortcutsView *view,
 
 
 
-static void
-thunar_shortcuts_view_update_selection (ThunarShortcutsView *view,
-                                        ThunarShortcutGroup *group,
-                                        gpointer             user_data)
-{
-  ThunarFile *file = THUNAR_FILE (user_data);
-
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_GROUP (group));
-  _thunar_return_if_fail (THUNAR_IS_FILE (file));
-
-  thunar_shortcut_group_update_selection (group, file);
-}
-
-
-
 /**
  * thunar_shortcuts_view_new:
  *
@@ -1452,9 +1386,16 @@ void
 thunar_shortcuts_view_select_by_file (ThunarShortcutsView *view,
                                       ThunarFile          *file)
 {
+  GList *children;
+  GList *iter;
+
   _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
   _thunar_return_if_fail (THUNAR_IS_FILE (file));
 
-  thunar_shortcuts_view_foreach_group (view, thunar_shortcuts_view_update_selection,
-                                       file);
+  children = gtk_container_get_children (GTK_CONTAINER (view->group_box));
+
+  for (iter = children; iter != NULL; iter = iter->next)
+    thunar_shortcut_group_update_selection (iter->data, file);
+
+  g_list_free (children);
 }
