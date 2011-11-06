@@ -171,9 +171,11 @@ thunar_shortcut_group_dispose (GObject *object)
 static void
 thunar_shortcut_group_finalize (GObject *object)
 {
-#if 0
   ThunarShortcutGroup *group = THUNAR_SHORTCUT_GROUP (object);
-#endif
+
+  /* abort flashing if still active */
+  if (group->flash_idle_id > 0)
+    g_source_remove (group->flash_idle_id);
 
   (*G_OBJECT_CLASS (thunar_shortcut_group_parent_class)->finalize) (object);
 }
@@ -401,6 +403,34 @@ thunar_shortcut_group_unprelight_shortcuts (ThunarShortcutGroup *group,
         {
           gtk_widget_set_state (GTK_WIDGET (shortcut), GTK_STATE_NORMAL);
         }
+    }
+
+  g_list_free (children);
+}
+
+
+
+void
+thunar_shortcut_group_update_selection (ThunarShortcutGroup *group,
+                                        ThunarFile          *file)
+{
+  ThunarShortcut *shortcut;
+  GList          *children;
+  GList          *iter;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_GROUP (group));
+  _thunar_return_if_fail (THUNAR_IS_FILE (file));
+
+  children = gtk_container_get_children (GTK_CONTAINER (group->shortcuts));
+
+  for (iter = children; iter != NULL; iter = iter->next)
+    {
+      shortcut = THUNAR_SHORTCUT (iter->data);
+
+      if (thunar_shortcut_matches_file (shortcut, file))
+        gtk_widget_set_state (GTK_WIDGET (shortcut), GTK_STATE_SELECTED);
+      else if (gtk_widget_get_state (GTK_WIDGET (shortcut)) == GTK_STATE_SELECTED)
+        gtk_widget_set_state (GTK_WIDGET (shortcut), GTK_STATE_NORMAL);
     }
 
   g_list_free (children);

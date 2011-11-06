@@ -2174,3 +2174,61 @@ thunar_shortcut_disconnect (ThunarShortcut *shortcut)
   /* release the mount operation */
   g_object_unref (mount_operation);
 }
+
+
+
+gboolean
+thunar_shortcut_matches_file (ThunarShortcut *shortcut,
+                              ThunarFile     *file)
+{
+  gboolean matches = FALSE;
+  GVolume *shortcut_volume;
+  GMount  *mount;
+  GFile   *mount_point;
+  GFile   *shortcut_file;
+
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT (shortcut), FALSE);
+  _thunar_return_val_if_fail (THUNAR_IS_FILE (file), FALSE);
+
+  /* get the file and volume of the view */
+  shortcut_file = thunar_shortcut_get_location (shortcut);
+  shortcut_volume = thunar_shortcut_get_volume (shortcut);
+
+  /* check if we have a volume */
+  if (shortcut_volume != NULL)
+    {
+      /* get the mount point */
+      mount = g_volume_get_mount (shortcut_volume);
+      if (mount != NULL)
+        {
+          mount_point = g_mount_get_root (mount);
+
+          /* select the shortcut if the mount point and the selected file are equal */
+          if (g_file_equal (file->gfile, mount_point))
+            matches = TRUE;
+
+          /* release mount point and mount */
+          g_object_unref (mount_point);
+          g_object_unref (mount);
+        }
+    }
+  else if (shortcut->mount != NULL)
+    {
+      mount_point = g_mount_get_root (shortcut->mount);
+
+      /* select the shortcut if the mount point and the selected file are equal */
+      if (g_file_equal (file->gfile, mount_point))
+        matches = TRUE;
+
+      /* release mount point and mount */
+      g_object_unref (mount_point);
+    }
+  else if (shortcut_file != NULL)
+    {
+      /* select the shortcut if the bookmark and the selected file are equal */
+      if (g_file_equal (file->gfile, shortcut_file))
+        matches = TRUE;
+    }
+
+  return matches;
+}

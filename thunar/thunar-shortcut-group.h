@@ -21,6 +21,7 @@
 #ifndef __THUNAR_SHORTCUT_GROUP_H__
 #define __THUNAR_SHORTCUT_GROUP_H__
 
+#include <thunar/thunar-file.h>
 #include <thunar/thunar-shortcut.h>
 
 G_BEGIN_DECLS
@@ -46,6 +47,8 @@ void       thunar_shortcut_group_unselect_shortcuts   (ThunarShortcutGroup *grou
                                                        ThunarShortcut      *exception);
 void       thunar_shortcut_group_unprelight_shortcuts (ThunarShortcutGroup *group,
                                                        ThunarShortcut      *exception);
+void       thunar_shortcut_group_update_selection     (ThunarShortcutGroup *group,
+                                                       ThunarFile          *file);
 
 G_END_DECLS
 

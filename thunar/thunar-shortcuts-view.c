@@ -170,10 +170,10 @@ static void               thunar_shortcuts_view_unselect_rows            (Thunar
 static void               thunar_shortcuts_view_unprelight_rows          (ThunarShortcutsView              *view,
                                                                           ThunarShortcutRow                *row,
                                                                           gpointer                          user_data);
-static void               thunar_shortcuts_view_update_selection_by_file (ThunarShortcutsView              *view,
-                                                                          ThunarShortcutRow                *row,
-                                                                          gpointer                          user_data);
 #endif
+static void               thunar_shortcuts_view_update_selection         (ThunarShortcutsView              *view,
+                                                                          ThunarShortcutGroup              *group,
+                                                                          gpointer                          user_data);
 
 
 
@@ -386,132 +386,6 @@ thunar_shortcuts_view_set_property (GObject      *object,
 
 #if 0
 static void
-thunar_shortcuts_view_row_inserted (ThunarShortcutsView *view,
-                                    GtkTreePath         *path,
-                                    GtkTreeIter         *iter,
-                                    GtkTreeModel        *model)
-{
-  ThunarShortcutType shortcut_type;
-  GtkWidget         *box;
-  GtkWidget         *expander;
-  GtkWidget         *shortcut_row;
-  gboolean           category;
-  gboolean           visible;
-  GVolume           *volume;
-  GMount            *mount;
-  GFile             *location;
-  GIcon             *eject_icon;
-  GIcon             *icon;
-  gchar             *name;
-  guint              flash_idle;
-  gint               category_index;
-  gint               shortcut_index;
-
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
-  _thunar_return_if_fail (path != NULL);
-  _thunar_return_if_fail (iter != NULL);
-  _thunar_return_if_fail (GTK_IS_TREE_MODEL (model) && model == view->model);
-
-  /* read information from the new row */
-  gtk_tree_model_get (model, iter,
-                      THUNAR_SHORTCUTS_MODEL_COLUMN_CATEGORY, &category,
-                      THUNAR_SHORTCUTS_MODEL_COLUMN_ICON, &icon,
-                      THUNAR_SHORTCUTS_MODEL_COLUMN_NAME, &name,
-                      THUNAR_SHORTCUTS_MODEL_COLUMN_LOCATION, &location,
-                      THUNAR_SHORTCUTS_MODEL_COLUMN_VOLUME, &volume,
-                      THUNAR_SHORTCUTS_MODEL_COLUMN_MOUNT, &mount,
-                      THUNAR_SHORTCUTS_MODEL_COLUMN_EJECT_ICON, &eject_icon,
-                      THUNAR_SHORTCUTS_MODEL_COLUMN_VISIBLE, &visible,
-                      THUNAR_SHORTCUTS_MODEL_COLUMN_SHORTCUT_TYPE, &shortcut_type,
-                      -1);
-
-  if (category)
-    {
-      /* we will have to implement this at some point but right now the
-       * categories are hard-coded and will not change */
-      _thunar_assert_not_reached ();
-    }
-  else
-    {
-      /* create a row widget for the shortcut */
-      shortcut_row = g_object_new (THUNAR_TYPE_SHORTCUT_ROW,
-                                   "location", location,
-                                   "volume", volume,
-                                   "mount", mount,
-                                   "shortcut-type", shortcut_type,
-                                   "icon", icon,
-                                   "eject-icon", eject_icon,
-                                   "label", name,
-                                   NULL);
-
-      /* get the category and shortcut index */
-      category_index = gtk_tree_path_get_indices (path)[0];
-      shortcut_index = gtk_tree_path_get_indices (path)[1];
-
-      /* find the expander for the row widget */
-      expander = thunar_shortcuts_view_get_expander_at (view, category_index);
-
-      /* if this fails then we are out of sync with the model */
-      g_assert (expander != NULL);
-
-      /* get the box widget for placing the row */
-      box = gtk_bin_get_child (GTK_BIN (expander));
-
-      /* add the new row to the box and show it */
-      gtk_container_add (GTK_CONTAINER (box), shortcut_row);
-
-      /* move the row to the correct location */
-      gtk_box_reorder_child (GTK_BOX (box), shortcut_row, shortcut_index);
-
-      /* show the row now (unless it was hidden by the user) */
-      gtk_widget_set_visible (shortcut_row, visible);
-
-      /* be notified when the user wishes to open the shortcut */
-      g_signal_connect_swapped (shortcut_row, "activated",
-                                G_CALLBACK (thunar_shortcuts_view_row_activated), view);
-
-      /* be notified when the state of the row changes (e.g. when it is
-       * being hovered or selected by the user) */
-      g_signal_connect_swapped (shortcut_row, "state-changed",
-                                G_CALLBACK (thunar_shortcuts_view_row_state_changed),
-                                view);
-
-      /* be notified when a context menu should be displayed for the row */
-      g_signal_connect_swapped (shortcut_row, "context-menu",
-                                G_CALLBACK (thunar_shortcuts_view_row_context_menu),
-                                view);
-
-      /* flash the expander if it is collapsed */
-      if (!gtk_expander_get_expanded (GTK_EXPANDER (expander)))
-        {
-          /* abort active flash idle handlers */
-          flash_idle = 
-            GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (expander), 
-                                                  thunar_shortcuts_view_idle_quark));
-          if (flash_idle > 0)
-            g_source_remove (flash_idle);
-
-          /* reschedule the flash idle */
-          flash_idle = g_timeout_add (THUNAR_SHORTCUTS_VIEW_FLASH_TIMEOUT,
-                                      thunar_shortcuts_view_flash_expander,
-                                      expander);
-
-          /* remember the idle handler */
-          g_object_set_qdata (G_OBJECT (expander),
-                              thunar_shortcuts_view_idle_quark,
-                              GUINT_TO_POINTER (flash_idle));
-
-          /* reset the flash counter to 0 */
-          g_object_set_qdata (G_OBJECT (expander),
-                              thunar_shortcuts_view_counter_quark,
-                             GUINT_TO_POINTER (0));
-        }
-    }
-}
-
-
-
-static void
 thunar_shortcuts_view_row_deleted (ThunarShortcutsView *view,
                                    GtkTreePath         *path,
                                    GtkTreeModel        *model)
@@ -550,199 +424,6 @@ thunar_shortcuts_view_row_deleted (ThunarShortcutsView *view,
 
   /* free the row list */
   g_list_free (rows);
-}
-
-
-
-static void
-thunar_shortcuts_view_row_changed (ThunarShortcutsView *view,
-                                   GtkTreePath         *path,
-                                   GtkTreeIter         *iter,
-                                   GtkTreeModel        *model)
-{
-  ThunarShortcutRow *row;
-  ThunarFile        *file;
-  GtkWidget         *expander;
-  GtkWidget         *box;
-  GIcon             *icon;
-  GList             *rows;
-  GList             *row_element;
-  gchar             *name;
-  gint               category_index;
-  gint               shortcut_index;
-
-  _thunar_return_if_fail (THUNAR_SHORTCUTS_VIEW (view));
-  _thunar_return_if_fail (GTK_IS_TREE_MODEL (model));
-
-  /* get the category and shortcut index */
-  category_index = gtk_tree_path_get_indices (path)[0];
-  shortcut_index = gtk_tree_path_get_indices (path)[1];
-
-  /* find the expander for the row widget */
-  expander = thunar_shortcuts_view_get_expander_at (view, category_index);
-
-  /* if this fails then we are out of sync with the model */
-  g_assert (expander != NULL);
-
-  /* get the box widget that holds the shortcut row */
-  box = gtk_bin_get_child (GTK_BIN (expander));
-
-  /* get a list of all shortcut rows */
-  rows = gtk_container_get_children (GTK_CONTAINER (box));
-
-  /* get the shortcut row we want to update */
-  row_element = g_list_nth (rows, shortcut_index);
-  if (row_element != NULL)
-    {
-      /* cast so that we have a proper row object to work with */
-      row = THUNAR_SHORTCUT_ROW (row_element->data);
-
-      /* read updated information from the tree row */
-      gtk_tree_model_get (model, iter,
-                          THUNAR_SHORTCUTS_MODEL_COLUMN_NAME, &name,
-                          THUNAR_SHORTCUTS_MODEL_COLUMN_ICON, &icon,
-                          THUNAR_SHORTCUTS_MODEL_COLUMN_FILE, &file,
-                          -1);
-
-      /* update the row */
-      g_object_set (row, "label", name, "icon", icon, "file", file, NULL);
-
-      /* release the values */
-      g_free (name);
-      if (icon != NULL)
-        g_object_unref (icon);
-      if (file != NULL)
-        g_object_unref (file);
-    }
-
-  /* free the row list */
-  g_list_free (rows);
-}
-
-
-
-static gboolean
-thunar_shortcuts_view_flash_expander (gpointer user_data)
-{
-  GtkWidget *expander = GTK_WIDGET (user_data);
-  GtkWidget *event_box;
-  guint      flash_count;
-
-  /* check how many times we have flashed the expander already */
-  flash_count = 
-    GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (expander), 
-                                          thunar_shortcuts_view_counter_quark));
-
-  /* get the expander event box */
-  event_box = gtk_widget_get_parent (expander);
-
-  /* change the base and background color */
-  if ((flash_count % 2) == 0)
-    {
-      gtk_widget_set_state (GTK_WIDGET (event_box), GTK_STATE_PRELIGHT);
-      gtk_widget_queue_draw (event_box);
-    }
-  else
-    {
-      gtk_widget_set_state (GTK_WIDGET (event_box), GTK_STATE_NORMAL);
-      gtk_widget_queue_draw (event_box);
-    }
-
-  /* increment the flash counter */
-  flash_count += 1;
-
-  /* abort if we have flashed several times */
-  if (flash_count >= (THUNAR_SHORTCUTS_VIEW_FLASH_TIMES * 2))
-    {
-      /* reset the event box color */
-      gtk_widget_set_state (GTK_WIDGET (event_box), GTK_STATE_NORMAL);
-      gtk_widget_queue_draw (event_box);
-
-      /* clear the flash counter */
-      g_object_set_qdata (G_OBJECT (expander),
-                          thunar_shortcuts_view_counter_quark,
-                          NULL);
-
-      /* clear the idle handler */
-      g_object_set_qdata (G_OBJECT (expander),
-                          thunar_shortcuts_view_idle_quark,
-                          NULL);
-
-      /* abort the timeout */
-      return FALSE;
-    }
-  else
-    {
-      /* update the flash counter */
-      g_object_set_qdata (G_OBJECT (expander),
-                          thunar_shortcuts_view_counter_quark,
-                          GUINT_TO_POINTER (flash_count));
-
-      return TRUE;
-    }
-}
-
-
-
-static GtkWidget *
-thunar_shortcuts_view_get_expander_at (ThunarShortcutsView *view,
-                                       gint                 expander_index)
-{
-  GtkWidget *expander = NULL;
-  GList     *expanders;
-  GList     *lp = NULL;
-
-  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view), NULL);
-  _thunar_return_val_if_fail (expander_index >= 0, NULL);
-
-  expanders = gtk_container_get_children (GTK_CONTAINER (view->expander_box));
-
-  lp = g_list_nth (expanders, expander_index);
-  if (lp != NULL)
-    expander = gtk_bin_get_child (GTK_BIN (lp->data));
-
-  g_list_free (expanders);
-
-  return expander;
-}
-
-
-
-static void
-thunar_shortcuts_view_row_activated (ThunarShortcutsView *view,
-                                     ThunarFile          *file,
-                                     gboolean             open_in_new_window,
-                                     ThunarShortcutRow   *row)
-{
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
-  _thunar_return_if_fail (THUNAR_IS_FILE (file));
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
-
-  thunar_shortcuts_view_open (view, file, open_in_new_window);
-}
-
-
-
-static void
-thunar_shortcuts_view_row_state_changed (ThunarShortcutsView *view,
-                                         GtkStateType         previous_state,
-                                         ThunarShortcutRow   *row)
-{
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
-
-  /* check if the row has been selected or highlighted */
-  if (gtk_widget_get_state (GTK_WIDGET (row)) == GTK_STATE_SELECTED)
-    {
-      /* unselect all other rows */
-      thunar_shortcuts_view_foreach_row (view, thunar_shortcuts_view_unselect_rows, row);
-    }
-  else if (gtk_widget_get_state (GTK_WIDGET (row)) == GTK_STATE_PRELIGHT)
-    {
-      /* unprelight all other rows */
-      thunar_shortcuts_view_foreach_row (view, thunar_shortcuts_view_unprelight_rows,
-                                         row);
-    }
 }
 
 
@@ -1062,153 +743,6 @@ thunar_shortcuts_view_find_selected_row (ThunarShortcutsView *view,
 
   if (gtk_widget_get_state (GTK_WIDGET (row)) == GTK_STATE_SELECTED)
     *return_value = row;
-}
-
-
-
-static void
-thunar_shortcuts_view_foreach_row (ThunarShortcutsView              *view,
-                                   ThunarShortcutsViewForeachRowFunc func,
-                                   gpointer                          user_data)
-{
-  GtkWidget *box;
-  GtkWidget *expander;
-  GList     *expander_boxes;
-  GList     *ep;
-  GList     *rows;
-  GList     *rp;
-
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
-  _thunar_return_if_fail (func != NULL);
-
-  /* get a list of all expanders */
-  expander_boxes = gtk_container_get_children (GTK_CONTAINER (view->expander_box));
-
-  /* iterate over all expander event boxes */
-  for (ep = expander_boxes; ep != NULL; ep = ep->next)
-    {
-      /* get the expander */
-      expander = gtk_bin_get_child (GTK_BIN (ep->data));
-
-      /* get the box that holds the rows */
-      box = gtk_bin_get_child (GTK_BIN (expander));
-
-      /* get a list of all rows in the box */
-      rows = gtk_container_get_children (GTK_CONTAINER (box));
-
-      /* iterate over all these rows */
-      for (rp = rows; rp != NULL; rp = rp->next)
-        {
-          /* call the foreach func */
-          (func) (view, THUNAR_SHORTCUT_ROW (rp->data), user_data);
-        }
-
-      /* free the list of rows */
-      g_list_free (rows);
-    }
-
-  /* free the list of expanders */
-  g_list_free (expander_boxes);
-}
-
-
-
-static void
-thunar_shortcuts_view_unselect_rows (ThunarShortcutsView *view,
-                                     ThunarShortcutRow   *row,
-                                     gpointer             user_data)
-{
-  ThunarShortcutRow *selected_row = THUNAR_SHORTCUT_ROW (user_data);
-
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (selected_row));
-
-  /* reset the row state if it is not the selected row */
-  if (row != selected_row && 
-      gtk_widget_get_state (GTK_WIDGET (row)) == GTK_STATE_SELECTED)
-    {
-      gtk_widget_set_state (GTK_WIDGET (row), GTK_STATE_NORMAL);
-    }
-}
-
-
-
-static void
-thunar_shortcuts_view_unprelight_rows (ThunarShortcutsView *view,
-                                       ThunarShortcutRow   *row,
-                                       gpointer             user_data)
-{
-  ThunarShortcutRow *selected_row = THUNAR_SHORTCUT_ROW (user_data);
-
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (selected_row));
-
-  /* reset the row state if it is not the selected row */
-  if (row != selected_row && 
-      gtk_widget_get_state (GTK_WIDGET (row)) == GTK_STATE_PRELIGHT)
-    {
-      gtk_widget_set_state (GTK_WIDGET (row), GTK_STATE_NORMAL);
-    }
-}
-
-
-
-static void
-thunar_shortcuts_view_update_selection_by_file (ThunarShortcutsView *view,
-                                                ThunarShortcutRow   *row,
-                                                gpointer             user_data)
-{
-  ThunarFile *file = THUNAR_FILE (user_data);
-  gboolean    select_row = FALSE;
-  GVolume    *row_volume;
-  GMount     *mount;
-  GFile      *mount_point;
-  GFile      *row_file;
-
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_ROW (row));
-  _thunar_return_if_fail (THUNAR_IS_FILE (file));
-
-  /* get the file and volume of the view */
-  row_file = thunar_shortcut_row_get_location (row);
-  row_volume = thunar_shortcut_row_get_volume (row);
-
-  /* check if we have a volume */
-  if (row_volume != NULL)
-    {
-      /* get the mount point */
-      mount = g_volume_get_mount (row_volume);
-      if (mount != NULL)
-        {
-          mount_point = g_mount_get_root (mount);
-
-          /* select the row if the mount point and the selected file are equal */
-          if (g_file_equal (file->gfile, mount_point))
-            select_row = TRUE;
-
-          /* release mount point and mount */
-          g_object_unref (mount_point);
-          g_object_unref (mount);
-        }
-    }
-  else if (row_file != NULL)
-    {
-      /* select the row if the bookmark and the selected file are equal */
-      if (g_file_equal (file->gfile, row_file))
-        select_row = TRUE;
-    }
-
-  /* apply the selection / unselection */
-  if (select_row)
-    {
-      gtk_widget_set_state (GTK_WIDGET (row), GTK_STATE_SELECTED);
-    }
-  else if (gtk_widget_get_state (GTK_WIDGET (row)) == GTK_STATE_SELECTED)
-    {
-      gtk_widget_set_state (GTK_WIDGET (row), GTK_STATE_NORMAL);
-    }
 }
 
 
@@ -1882,6 +1416,22 @@ thunar_shortcuts_view_open (ThunarShortcutsView *view,
 
 
 
+static void
+thunar_shortcuts_view_update_selection (ThunarShortcutsView *view,
+                                        ThunarShortcutGroup *group,
+                                        gpointer             user_data)
+{
+  ThunarFile *file = THUNAR_FILE (user_data);
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_GROUP (group));
+  _thunar_return_if_fail (THUNAR_IS_FILE (file));
+
+  thunar_shortcut_group_update_selection (group, file);
+}
+
+
+
 /**
  * thunar_shortcuts_view_new:
  *
@@ -1929,8 +1479,8 @@ thunar_shortcuts_view_add_file (ThunarShortcutsView *view,
  * @file : a #ThunarFile instance.
  *
  * Looks up the first shortcut that refers to @file in @view and selects it.
- * If @file is not present in the underlying #ThunarShortcutsModel, no
- * shortcut will be selected afterwards.
+ * If @file is not present in the underlying data model, no shortcut will 
+ * be selected afterwards.
  **/
 void
 thunar_shortcuts_view_select_by_file (ThunarShortcutsView *view,
@@ -1939,12 +1489,8 @@ thunar_shortcuts_view_select_by_file (ThunarShortcutsView *view,
   _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
   _thunar_return_if_fail (THUNAR_IS_FILE (file));
 
-  /* TODO */
-#if 0
-  thunar_shortcuts_view_foreach_row (view,
-                                     thunar_shortcuts_view_update_selection_by_file,
-                                     file);
-#endif
+  thunar_shortcuts_view_foreach_group (view, thunar_shortcuts_view_update_selection,
+                                       file);
 }
 
 
