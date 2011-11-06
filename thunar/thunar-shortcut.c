@@ -2049,6 +2049,110 @@ thunar_shortcut_resolve_and_activate (ThunarShortcut *shortcut,
 
 
 void
+thunar_shortcut_mount (ThunarShortcut *shortcut)
+{
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
+
+  /* TODO do not activate the item here */
+  thunar_shortcut_resolve_and_activate (shortcut, FALSE);
+}
+
+
+
+void
+thunar_shortcut_unmount (ThunarShortcut *shortcut)
+{
+  GMountOperation *mount_operation;
+  GtkWidget       *toplevel;
+  GMount          *mount;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
+
+  g_debug ("shortcut unmount");
+
+  /* check if we are currently mounting/ejecting something */
+  if (shortcut->state != THUNAR_SHORTCUT_STATE_NORMAL)
+    {
+      /* abort the current mount/eject process */
+      g_cancellable_cancel (shortcut->cancellable);
+      g_cancellable_reset (shortcut->cancellable);
+    }
+
+  /* create a mount operation */
+  toplevel = gtk_widget_get_toplevel (GTK_WIDGET (shortcut));
+  mount_operation = gtk_mount_operation_new (GTK_WINDOW (toplevel));
+  gtk_mount_operation_set_screen (GTK_MOUNT_OPERATION (mount_operation),
+                                  gtk_widget_get_screen (GTK_WIDGET (shortcut)));
+
+  if (shortcut->mount != NULL)
+    {
+      g_debug ("  have mount");
+
+      /* only handle mounts that can be unmounted here */
+      if (g_mount_can_unmount (shortcut->mount))
+        {
+          g_debug ("  mount can unmount");
+
+          /* start spinning */
+          thunar_shortcut_set_spinning (shortcut, TRUE, THUNAR_SHORTCUT_STATE_EJECTING);
+
+          g_debug ("  unmount now");
+
+          /* try unmounting the mount */
+          g_mount_unmount_with_operation (shortcut->mount,
+                                          G_MOUNT_UNMOUNT_NONE,
+                                          mount_operation,
+                                          shortcut->cancellable,
+                                          thunar_shortcut_mount_unmount_finish,
+                                          shortcut);
+        }
+    }
+  else if (shortcut->volume != NULL)
+    {
+      g_debug ("  have volume");
+      mount = g_volume_get_mount (shortcut->volume);
+      if (mount != NULL)
+        {
+          g_debug ("  have mount");
+
+          /* only handle mounts that can be unmounted here */
+          if (g_mount_can_unmount(mount))
+            {
+              g_debug ("  can unmount");
+
+              /* start spinning */
+              thunar_shortcut_set_spinning (shortcut, TRUE,
+                                            THUNAR_SHORTCUT_STATE_EJECTING);
+
+              g_debug ("  unmount now");
+
+              /* try unmounting the mount */
+              g_mount_unmount_with_operation (mount,
+                                              G_MOUNT_UNMOUNT_NONE,
+                                              mount_operation,
+                                              shortcut->cancellable,
+                                              thunar_shortcut_mount_unmount_finish,
+                                              shortcut);
+            }
+
+          /* release the mount */
+          g_object_unref (mount);
+        }
+      
+    }
+  else
+    {
+      /* this method was called despite no mount or volume being available
+       * for this shortcut... that should not happen */
+    }
+
+  /* release the mount operation */
+  g_object_unref (mount_operation);
+}
+
+
+
+void
 thunar_shortcut_disconnect (ThunarShortcut *shortcut)
 {
   GMountOperation *mount_operation;
