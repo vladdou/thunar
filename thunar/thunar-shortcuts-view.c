@@ -358,35 +358,6 @@ thunar_shortcuts_view_set_property (GObject      *object,
 
 
 
-static void
-thunar_shortcuts_view_open (ThunarShortcutsView *view,
-                            ThunarFile          *file,
-                            gboolean             new_window)
-{
-  ThunarApplication *application;
-
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view));
-  _thunar_return_if_fail (THUNAR_IS_FILE (file));
-
-  if (new_window)
-    {
-      /* open the file in a new window */
-      application = thunar_application_get ();
-      thunar_application_open_window (application, file,
-                                      gtk_widget_get_screen (GTK_WIDGET (view)),
-                                      NULL);
-      g_object_unref (application);
-    }
-  else
-    {
-      /* invoke the signal to change to the folder */
-      g_signal_emit (view, view_signals[SHORTCUT_ACTIVATED], 0, file);
-    }
-}
-#endif
-
-
-
 static gboolean
 thunar_shortcuts_view_load_system_shortcuts (gpointer user_data)
 {
@@ -1434,12 +1405,24 @@ gboolean
 thunar_shortcuts_view_has_file (ThunarShortcutsView *view,
                                 ThunarFile          *file)
 {
+  gboolean has_file = FALSE;
+  GList   *groups;
+  GList   *iter;
+
   _thunar_return_val_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view), FALSE);
   _thunar_return_val_if_fail (THUNAR_IS_FILE (file), FALSE);
 
-  /* TODO */
+  groups = gtk_container_get_children (GTK_CONTAINER (view->group_box));
 
-  return FALSE;
+  for (iter = groups; !has_file && iter != NULL; iter = iter->next)
+    {
+      if (thunar_shortcut_group_find_shortcut_by_file (iter->data, file, NULL))
+        has_file = TRUE;
+    }
+
+  g_list_free (groups);
+
+  return has_file;
 }
 
 
@@ -1475,5 +1458,3 @@ thunar_shortcuts_view_select_by_file (ThunarShortcutsView *view,
   thunar_shortcuts_view_foreach_group (view, thunar_shortcuts_view_update_selection,
                                        file);
 }
-
-

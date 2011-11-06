@@ -47,12 +47,17 @@ void       thunar_shortcut_group_unselect_shortcuts     (ThunarShortcutGroup *gr
                                                          ThunarShortcut      *exception);
 void       thunar_shortcut_group_unprelight_shortcuts   (ThunarShortcutGroup *group,
                                                          ThunarShortcut      *exception);
+void       thunar_shortcut_group_cancel_activations     (ThunarShortcutGroup *group,
+                                                         ThunarShortcut      *exception);
 void       thunar_shortcut_group_update_selection       (ThunarShortcutGroup *group,
                                                          ThunarFile          *file);
 void       thunar_shortcut_group_remove_volume_shortcut (ThunarShortcutGroup *group,
                                                          GVolume             *volume);
 void       thunar_shortcut_group_remove_mount_shortcut  (ThunarShortcutGroup *group,
                                                          GMount              *mount);
+gboolean   thunar_shortcut_group_find_shortcut_by_file  (ThunarShortcutGroup *group,
+                                                         ThunarFile          *file,
+                                                         ThunarShortcut     **result);
 
 G_END_DECLS
 

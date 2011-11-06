@@ -2049,6 +2049,16 @@ thunar_shortcut_resolve_and_activate (ThunarShortcut *shortcut,
 
 
 void
+thunar_shortcut_cancel_activation (ThunarShortcut *shortcut)
+{
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
+
+  /* TODO we need a cancellable for the ThunarBrowser interface */
+}
+
+
+
+void
 thunar_shortcut_mount (ThunarShortcut *shortcut)
 {
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));

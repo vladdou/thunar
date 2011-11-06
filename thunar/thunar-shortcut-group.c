@@ -411,6 +411,32 @@ thunar_shortcut_group_unprelight_shortcuts (ThunarShortcutGroup *group,
 
 
 void
+thunar_shortcut_group_cancel_activations (ThunarShortcutGroup *group,
+                                          ThunarShortcut      *exception)
+{
+  ThunarShortcut *shortcut;
+  GList          *children;
+  GList          *iter;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_GROUP (group));
+  _thunar_return_if_fail (exception == NULL || THUNAR_IS_SHORTCUT (exception));
+
+  children = gtk_container_get_children (GTK_CONTAINER (group->shortcuts));
+
+  for (iter = children; iter != NULL; iter = iter->next)
+    {
+      shortcut = THUNAR_SHORTCUT (iter->data);
+
+      if (shortcut != exception)
+        thunar_shortcut_cancel_activation (shortcut);
+    }
+
+  g_list_free (children);
+}
+
+
+
+void
 thunar_shortcut_group_update_selection (ThunarShortcutGroup *group,
                                         ThunarFile          *file)
 {
@@ -496,4 +522,42 @@ thunar_shortcut_group_remove_mount_shortcut (ThunarShortcutGroup *group,
     }
 
   g_list_free (children);
+}
+
+
+
+gboolean
+thunar_shortcut_group_find_shortcut_by_file (ThunarShortcutGroup *group,
+                                             ThunarFile          *file,
+                                             ThunarShortcut     **result)
+{
+  ThunarShortcut *shortcut;
+  gboolean         has_shortcut = FALSE;
+  GList           *children;
+  GList           *iter;
+
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT_GROUP (group), FALSE);
+  _thunar_return_val_if_fail (THUNAR_IS_FILE (file), FALSE);
+
+  children = gtk_container_get_children (GTK_CONTAINER (group->shortcuts));
+
+  if (result != NULL)
+    *result = NULL;
+
+  for (iter = children; !has_shortcut && iter != NULL; iter = iter->next)
+    {
+      shortcut = THUNAR_SHORTCUT (iter->data);
+
+      if (thunar_shortcut_matches_file (shortcut, file))
+        {
+          if (result != NULL)
+            *result = shortcut;
+
+          has_shortcut = TRUE;
+        }
+    }
+
+  g_list_free (children);
+
+  return has_shortcut;
 }

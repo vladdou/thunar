@@ -83,6 +83,7 @@ void               thunar_shortcut_set_persistent       (ThunarShortcut    *shor
                                                          gboolean           persistent);
 void               thunar_shortcut_resolve_and_activate (ThunarShortcut    *shortcut,
                                                          gboolean           open_in_new_window);
+void               thunar_shortcut_cancel_activation    (ThunarShortcut    *shortcut);
 void               thunar_shortcut_mount                (ThunarShortcut    *shortcut);
 void               thunar_shortcut_unmount              (ThunarShortcut    *shortcut);
 void               thunar_shortcut_disconnect           (ThunarShortcut    *shortcut);
