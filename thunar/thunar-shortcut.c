@@ -707,8 +707,8 @@ thunar_shortcut_button_press_event (GtkWidget      *widget,
     }
   else if (event->button == 3)
     {
-      /* TODO start a context menu timeout */
-      g_debug ("right button press");
+      /* emit the context menu signal */
+      g_signal_emit (widget, SIGNAL_CONTEXT_MENU, 0);
     }
   else if (event->button == 2)
     {
