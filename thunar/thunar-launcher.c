@@ -770,7 +770,7 @@ thunar_launcher_update (ThunarLauncher *launcher)
   /* update the user interface depending on the current selection */
   if (G_LIKELY (n_selected_files == 0 || n_directories > 0))
     {
-      /** CASE 1: nothing selected or atleast one directory in the selection
+      /** CASE 1: nothing selected or at least one directory in the selection
        **
        ** - "Open" and "Open in n New Windows" actions
        **/
@@ -793,7 +793,7 @@ thunar_launcher_update (ThunarLauncher *launcher)
         }
       else
         {
-          /* the "Open" action is sensitive if we have atleast one selected file,
+          /* the "Open" action is sensitive if we have at least one selected file,
            * the label is set to "Open in New Window" if we're not in a regular
            * view (i.e. current_directory is not set) and have only one directory
            * selected to reflect that this action will open a new window.

@@ -1770,6 +1770,14 @@ thunar_standard_view_merge_custom_actions (ThunarStandardView *standard_view,
           /* add the action to the UI manager */
           if (G_LIKELY (selected_items != NULL))
             {
+              /* add to the file menu */
+              gtk_ui_manager_add_ui (standard_view->ui_manager,
+                                     standard_view->priv->custom_merge_id,
+                                     "/file-menu/placeholder-custom-actions",
+                                     gtk_action_get_name (GTK_ACTION (lp->data)),
+                                     gtk_action_get_name (GTK_ACTION (lp->data)),
+                                     GTK_UI_MANAGER_MENUITEM, FALSE);
+
               /* add to the file context menu */
               gtk_ui_manager_add_ui (standard_view->ui_manager,
                                      standard_view->priv->custom_merge_id,

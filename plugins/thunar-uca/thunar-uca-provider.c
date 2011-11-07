@@ -216,6 +216,7 @@ thunar_uca_provider_get_file_actions (ThunarxMenuProvider *menu_provider,
                               -1);
 
           /* generate a unique action name */
+          /* FIXME this name is persistent only if actions are not re-ordered in the GUI */
           name = g_strdup_printf ("ThunarUca::action-%d", ++uca_provider->last_action_id);
 
           /* create the new action with the given parameters */
