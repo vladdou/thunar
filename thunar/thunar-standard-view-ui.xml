@@ -15,16 +15,6 @@
         <menuitem action="create-folder" />
         <menuitem action="create-document" />
       </placeholder>
-      <placeholder name="placeholder-clipboard-actions">
-        <menuitem action="cut" />
-        <menuitem action="copy" />
-        <menuitem action="paste-into-folder" />
-        <menuitem action="delete" />
-      </placeholder>
-      <placeholder name="placeholder-edit-actions">
-        <menuitem action="rename" />
-        <menuitem action="restore" />
-      </placeholder>
       <placeholder name="placeholder-file-properties">
         <menuitem action="properties" />
       </placeholder>
