@@ -1,7 +1,7 @@
 /* $Id$ */
 /*-
  * Copyright (c) 2005-2006 Benedikt Meurer <benny@xfce.org>
- * Copyright (c) 2009 Jannis Pohlmann <jannis@xfce.org>
+ * Copyright (c) 2009-2011 Jannis Pohlmann <jannis@xfce.org>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -27,6 +27,8 @@
 
 #include <libxfce4util/libxfce4util.h>
 #include <libxfce4ui/libxfce4ui.h>
+
+#include <exo/exo.h>
 
 #include <thunar-uca/thunar-uca-chooser.h>
 #include <thunar-uca/thunar-uca-context.h>
@@ -201,6 +203,7 @@ thunar_uca_provider_get_file_actions (ThunarxMenuProvider *menu_provider,
   gchar               *tooltip;
   gchar               *label;
   gchar               *name;
+  gchar               *unique_id;
 
   paths = thunar_uca_model_match (uca_provider->model, files);
   for (lp = g_list_last (paths); lp != NULL; lp = lp->prev)
@@ -211,13 +214,13 @@ thunar_uca_provider_get_file_actions (ThunarxMenuProvider *menu_provider,
           /* determine the label, tooltip and stock-id for the item */
           gtk_tree_model_get (GTK_TREE_MODEL (uca_provider->model), &iter,
                               THUNAR_UCA_MODEL_COLUMN_NAME, &label,
+                              THUNAR_UCA_MODEL_COLUMN_UNIQUE_ID, &unique_id,
                               THUNAR_UCA_MODEL_COLUMN_ICON, &icon_name,
                               THUNAR_UCA_MODEL_COLUMN_DESCRIPTION, &tooltip,
                               -1);
 
           /* generate a unique action name */
-          /* FIXME this name is persistent only if actions are not re-ordered in the GUI */
-          name = g_strdup_printf ("ThunarUca::action-%d", ++uca_provider->last_action_id);
+          name = g_strdup_printf ("ThunarUca::action-%s", unique_id);
 
           /* create the new action with the given parameters */
           action = gtk_action_new (name, label, tooltip, NULL);
@@ -251,6 +254,7 @@ thunar_uca_provider_get_file_actions (ThunarxMenuProvider *menu_provider,
           g_free (icon_name);
           g_free (tooltip);
           g_free (label);
+          g_free (unique_id);
           g_free (name);
         }
 

@@ -1,6 +1,7 @@
 /* $Id$ */
 /*-
  * Copyright (c) 2005-2007 Benedikt Meurer <benny@xfce.org>
+ * Copyright (c) 2011 Jannis Pohlmann <jannis@xfce.org>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -41,6 +42,9 @@ static void           thunar_uca_editor_set_icon_name   (ThunarUcaEditor        
 static ThunarUcaTypes thunar_uca_editor_get_types       (const ThunarUcaEditor  *uca_editor);
 static void           thunar_uca_editor_set_types       (ThunarUcaEditor        *uca_editor,
                                                          ThunarUcaTypes          types);
+static const gchar   *thunar_uca_editor_get_unique_id   (const ThunarUcaEditor  *uca_editor);
+static void           thunar_uca_editor_set_unique_id   (ThunarUcaEditor        *uca_editor,
+                                                         const gchar            *unique_id);
 static void           thunar_uca_editor_command_clicked (ThunarUcaEditor        *uca_editor);
 static void           thunar_uca_editor_icon_clicked    (ThunarUcaEditor        *uca_editor);
 
@@ -101,6 +105,7 @@ thunar_uca_editor_init (ThunarUcaEditor *uca_editor)
   GtkWidget      *table;
   GtkWidget      *hbox;
   GtkWidget      *vbox;
+  gchar          *unique_id;
 
   /* configure the dialog properties */
   gtk_dialog_add_button (GTK_DIALOG (uca_editor), GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL);
@@ -454,6 +459,11 @@ thunar_uca_editor_init (ThunarUcaEditor *uca_editor)
   gtk_misc_set_alignment (GTK_MISC (label), 0.0f, 0.0f);
   gtk_box_pack_start (GTK_BOX (hbox), label, TRUE, TRUE, 0);
   gtk_widget_show (label);
+
+  /* set a unique ID for new items. this will be overridden by existing items */
+  unique_id = thunar_uca_model_get_unique_id ();
+  thunar_uca_editor_set_unique_id (uca_editor, unique_id);
+  g_free (unique_id);
 }
 
 
@@ -751,6 +761,30 @@ thunar_uca_editor_set_types (ThunarUcaEditor *uca_editor,
 
 
 
+static const gchar*
+thunar_uca_editor_get_unique_id (const ThunarUcaEditor *uca_editor)
+{
+  g_return_val_if_fail (THUNAR_UCA_IS_EDITOR (uca_editor), NULL);
+  return g_object_get_data (G_OBJECT (uca_editor->icon_button), "thunar-uca-unique-id");
+}
+
+
+
+static void
+thunar_uca_editor_set_unique_id (ThunarUcaEditor *uca_editor,
+                                 const gchar     *unique_id)
+{
+  g_return_if_fail (THUNAR_UCA_IS_EDITOR (uca_editor));
+
+  /* remember the unique ID for the item */
+  g_object_set_data_full (G_OBJECT (uca_editor->icon_button),
+                          "thunar-uca-unique-id",
+                          g_strdup (unique_id),
+                          g_free);
+}
+
+
+
 /**
  * thunar_uca_editor_load:
  * @uca_editor  : a #ThunarUcaEditor.
@@ -771,6 +805,7 @@ thunar_uca_editor_load (ThunarUcaEditor *uca_editor,
   gchar         *command;
   gchar         *icon;
   gchar         *name;
+  gchar         *unique_id;
   gboolean       startup_notify;
 
   g_return_if_fail (THUNAR_UCA_IS_EDITOR (uca_editor));
@@ -785,6 +820,7 @@ thunar_uca_editor_load (ThunarUcaEditor *uca_editor,
                       THUNAR_UCA_MODEL_COLUMN_TYPES, &types,
                       THUNAR_UCA_MODEL_COLUMN_ICON, &icon,
                       THUNAR_UCA_MODEL_COLUMN_NAME, &name,
+                      THUNAR_UCA_MODEL_COLUMN_UNIQUE_ID, &unique_id,
                       THUNAR_UCA_MODEL_COLUMN_STARTUP_NOTIFY, &startup_notify,
                       -1);
 
@@ -793,6 +829,9 @@ thunar_uca_editor_load (ThunarUcaEditor *uca_editor,
 
   /* setup the new icon */
   thunar_uca_editor_set_icon_name (uca_editor, icon);
+
+  /* setup the unique ID */
+  thunar_uca_editor_set_unique_id (uca_editor, unique_id);
 
   /* apply the new values */
   gtk_entry_set_text (GTK_ENTRY (uca_editor->description_entry), (description != NULL) ? description : "");
@@ -806,6 +845,7 @@ thunar_uca_editor_load (ThunarUcaEditor *uca_editor,
   g_free (patterns);
   g_free (command);
   g_free (icon);
+  g_free (unique_id);
   g_free (name);
 }
 
@@ -831,6 +871,7 @@ thunar_uca_editor_save (ThunarUcaEditor *uca_editor,
 
   thunar_uca_model_update (uca_model, iter,
                            gtk_entry_get_text (GTK_ENTRY (uca_editor->name_entry)),
+                           thunar_uca_editor_get_unique_id (uca_editor),
                            gtk_entry_get_text (GTK_ENTRY (uca_editor->description_entry)),
                            thunar_uca_editor_get_icon_name (uca_editor),
                            gtk_entry_get_text (GTK_ENTRY (uca_editor->command_entry)),

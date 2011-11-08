@@ -1,6 +1,7 @@
 /* $Id$ */
 /*-
  * Copyright (c) 2005 Benedikt Meurer <benny@xfce.org>
+ * Copyright (c) 2011 Jannis Pohlmann <jannis@xfce.org>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -38,6 +39,7 @@ typedef struct _ThunarUcaModel      ThunarUcaModel;
 typedef enum
 {
   THUNAR_UCA_MODEL_COLUMN_NAME,
+  THUNAR_UCA_MODEL_COLUMN_UNIQUE_ID,
   THUNAR_UCA_MODEL_COLUMN_DESCRIPTION,
   THUNAR_UCA_MODEL_COLUMN_ICON,
   THUNAR_UCA_MODEL_COLUMN_COMMAND,
@@ -88,6 +90,7 @@ void            thunar_uca_model_remove         (ThunarUcaModel         *uca_mod
 void            thunar_uca_model_update         (ThunarUcaModel         *uca_model,
                                                  GtkTreeIter            *iter,
                                                  const gchar            *name,
+                                                 const gchar            *unique_id,
                                                  const gchar            *description,
                                                  const gchar            *icon,
                                                  const gchar            *command,
@@ -104,6 +107,8 @@ gboolean        thunar_uca_model_parse_argv     (ThunarUcaModel         *uca_mod
                                                  gint                   *argcp,
                                                  gchar                ***argvp,
                                                  GError                **error);
+
+gchar          *thunar_uca_model_get_unique_id  (void) G_GNUC_MALLOC G_GNUC_WARN_UNUSED_RESULT;
 
 G_END_DECLS;
 
