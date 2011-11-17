@@ -61,6 +61,11 @@ static void     thunar_shortcut_group_set_property      (GObject                
                                                          GParamSpec             *pspec);
 static void     thunar_shortcut_group_attract_attention (ThunarShortcutGroup    *group);
 static gboolean thunar_shortcut_group_flash_expander    (gpointer                user_data);
+static void     thunar_shortcut_group_expand_style_set  (ThunarShortcutGroup    *group,
+                                                         GtkStyle               *style,
+                                                         GtkWidget              *expander);
+static void     thunar_shortcut_group_apply_indentation (ThunarShortcutGroup    *group,
+                                                         ThunarShortcut         *shortcut);
 
 
 
@@ -137,6 +142,10 @@ thunar_shortcut_group_init (ThunarShortcutGroup *group)
   gtk_expander_set_spacing (GTK_EXPANDER (group->expander), 0);
   gtk_container_add (GTK_CONTAINER (group), group->expander);
   gtk_widget_show (group->expander);
+
+  g_signal_connect_swapped (group->expander, "style-set",
+                            G_CALLBACK (thunar_shortcut_group_expand_style_set),
+                            group);
 
   /* add a box for the individual shortcuts */
   group->shortcuts = gtk_vbox_new (TRUE, 0);
@@ -309,6 +318,52 @@ thunar_shortcut_group_flash_expander (gpointer user_data)
 
 
 
+static void
+thunar_shortcut_group_expand_style_set (ThunarShortcutGroup *group,
+                                        GtkStyle            *style,
+                                        GtkWidget           *expander)
+{
+  GList *children;
+  GList *iter;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_GROUP (group));
+  _thunar_return_if_fail (GTK_IS_EXPANDER (expander));
+  _thunar_return_if_fail (expander == group->expander);
+  
+  children = gtk_container_get_children (GTK_CONTAINER (group->shortcuts));
+
+  for (iter = children; iter != NULL; iter = iter->next)
+    thunar_shortcut_group_apply_indentation (group, THUNAR_SHORTCUT (iter->data));
+
+  g_list_free (children);
+}
+
+
+
+static void
+thunar_shortcut_group_apply_indentation (ThunarShortcutGroup *group,
+                                         ThunarShortcut      *shortcut)
+{
+  GtkWidget *alignment;
+  gint       expander_size;
+  gint       expander_spacing;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_GROUP (group));
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
+
+  /* get information about the expander arrow size */
+  gtk_widget_style_get (group->expander,
+                        "expander-size", &expander_size,
+                        "expander-spacing", &expander_spacing,
+                        NULL);
+
+  /* apply the indentation to the shortcut alignment */
+  alignment = thunar_shortcut_get_alignment (shortcut);
+  g_object_set (alignment, "left-padding", expander_size + expander_spacing * 2 + 1, NULL);
+}
+
+
+
 GtkWidget *
 thunar_shortcut_group_new (const gchar       *label,
                            ThunarShortcutType accepted_types)
@@ -340,6 +395,9 @@ thunar_shortcut_group_try_add_shortcut (ThunarShortcutGroup *group,
     return FALSE;
 
   /* TODO find the sorting, remembered or user-defined position for the shortcut */
+
+  /* properly align the shortcut contents with the group title */
+  thunar_shortcut_group_apply_indentation (group, shortcut);
 
   gtk_box_pack_start (GTK_BOX (group->shortcuts), GTK_WIDGET (shortcut), FALSE, TRUE, 0);
   gtk_widget_show (GTK_WIDGET (shortcut));

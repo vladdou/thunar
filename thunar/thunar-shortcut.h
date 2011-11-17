@@ -81,6 +81,7 @@ void               thunar_shortcut_set_mutable          (ThunarShortcut    *shor
 gboolean           thunar_shortcut_get_persistent       (ThunarShortcut    *shortcut);
 void               thunar_shortcut_set_persistent       (ThunarShortcut    *shortcut,
                                                          gboolean           persistent);
+GtkWidget         *thunar_shortcut_get_alignment        (ThunarShortcut    *shortcut);
 void               thunar_shortcut_resolve_and_activate (ThunarShortcut    *shortcut,
                                                          gboolean           open_in_new_window);
 void               thunar_shortcut_cancel_activation    (ThunarShortcut    *shortcut);

@@ -191,6 +191,7 @@ struct _ThunarShortcut
   guint               persistent : 1;
   guint               constructed : 1;
 
+  GtkWidget          *alignment;
   GtkWidget          *label_widget;
   GtkWidget          *icon_image;
   GtkWidget          *action_button;
@@ -391,7 +392,6 @@ thunar_shortcut_class_init (ThunarShortcutClass *klass)
 static void
 thunar_shortcut_init (ThunarShortcut *shortcut)
 {
-  GtkWidget *alignment;
   GtkWidget *box;
 
   /* create a cancellable for aborting mount/unmount operations */
@@ -405,15 +405,14 @@ thunar_shortcut_init (ThunarShortcut *shortcut)
   gtk_widget_set_sensitive (GTK_WIDGET (shortcut), TRUE);
 
   /* create the alignment for left and right padding */
-  alignment = gtk_alignment_new (0.0f, 0.0f, 1.0f, 1.0f);
-  /* TODO use expander arrow width instead of 16 here */
-  gtk_alignment_set_padding (GTK_ALIGNMENT (alignment), 0, 0, 16, 4);
-  gtk_container_add (GTK_CONTAINER (shortcut), alignment);
-  gtk_widget_show (alignment);
+  shortcut->alignment = gtk_alignment_new (0.0f, 0.0f, 1.0f, 1.0f);
+  gtk_alignment_set_padding (GTK_ALIGNMENT (shortcut->alignment), 0, 0, 0, 4);
+  gtk_container_add (GTK_CONTAINER (shortcut), shortcut->alignment);
+  gtk_widget_show (shortcut->alignment);
 
   /* create a box for the different sub-widgets */
   box = gtk_hbox_new (FALSE, 4);
-  gtk_container_add (GTK_CONTAINER (alignment), box);
+  gtk_container_add (GTK_CONTAINER (shortcut->alignment), box);
   gtk_widget_show (box);
 
   /* create the icon widget */
@@ -1995,6 +1994,15 @@ thunar_shortcut_set_persistent (ThunarShortcut *shortcut,
   shortcut->persistent = persistent;
 
   g_object_notify (G_OBJECT (shortcut), "persistent");
+}
+
+
+
+GtkWidget *
+thunar_shortcut_get_alignment (ThunarShortcut *shortcut)
+{
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT (shortcut), NULL);
+  return shortcut->alignment;
 }
 
 
