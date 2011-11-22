@@ -44,7 +44,6 @@
 #include <thunar/thunar-private.h>
 #include <thunar/thunar-shortcut-group.h>
 #include <thunar/thunar-shortcut.h>
-#include <thunar/thunar-shortcuts-model.h>
 #include <thunar/thunar-shortcuts-view.h>
 
 

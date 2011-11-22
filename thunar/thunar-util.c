@@ -1,7 +1,7 @@
 /* vi:set et ai sw=2 sts=2 ts=2: */
 /*-
  * Copyright (c) 2006-2007 Benedikt Meurer <benny@xfce.org>
- * Copyright (c) 2009-2010 Jannis Pohlmann <jannis@xfce.org>
+ * Copyright (c) 2009-2011 Jannis Pohlmann <jannis@xfce.org>
  *
  * This program is free software; you can redistribute it and/or 
  * modify it under the terms of the GNU General Public License as
@@ -59,6 +59,47 @@
 
 #include <glib.h>
 #include <glib/gstdio.h>
+
+
+
+/* I don't particularly like this here, but it's shared across a few
+ * files. */
+const gchar *_thunar_user_directory_names[9] = {
+  "Desktop", "Documents", "Download", "Music", "Pictures", "Public",
+  "Templates", "Videos", NULL,
+};
+
+
+
+/* Reads the current xdg user dirs locale from ~/.config/xdg-user-dirs.locale
+ * Notice that the result shall be freed by using g_free (). */
+gchar *
+_thunar_get_xdg_user_dirs_locale (void)
+{
+  gchar *file    = NULL;
+  gchar *content = NULL;
+  gchar *locale  = NULL;
+
+  /* get the file pathname */
+  file = g_build_filename (g_get_user_config_dir (), LOCALE_FILE_NAME, NULL);
+
+  /* grab the contents and get ride of the surrounding spaces */
+  if (g_file_get_contents (file, &content, NULL, NULL))
+    locale = g_strdup (g_strstrip (content));
+
+  g_free (content);
+  g_free (file);
+
+  /* if we got nothing, let's set the default locale as C */
+  if (exo_str_is_equal (locale, ""))
+    {
+      g_free (locale);
+      locale = g_strdup ("C");
+    }
+
+  return locale;
+}
+
 
 
 /**

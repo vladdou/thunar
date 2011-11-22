@@ -359,7 +359,9 @@ thunar_shortcut_group_apply_indentation (ThunarShortcutGroup *group,
 
   /* apply the indentation to the shortcut alignment */
   alignment = thunar_shortcut_get_alignment (shortcut);
-  g_object_set (alignment, "left-padding", expander_size + expander_spacing * 2 + 2, NULL);
+  g_object_set (alignment,
+                "left-padding", expander_size + expander_spacing * 2 + 2,
+                NULL);
 }
 
 

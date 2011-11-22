@@ -177,8 +177,6 @@ Thunar_SOURCES =							\
 	thunar-shortcut-group.h						\
 	thunar-shortcuts-icon-renderer.c				\
 	thunar-shortcuts-icon-renderer.h				\
-	thunar-shortcuts-model.c					\
-	thunar-shortcuts-model.h					\
 	thunar-shortcuts-pane.c						\
 	thunar-shortcuts-pane.h						\
 	thunar-shortcuts-pane-ui.h					\
