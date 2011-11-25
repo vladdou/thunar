@@ -37,27 +37,30 @@ typedef struct _ThunarShortcutGroupPrivate ThunarShortcutGroupPrivate;
 typedef struct _ThunarShortcutGroupClass   ThunarShortcutGroupClass;
 typedef struct _ThunarShortcutGroup        ThunarShortcutGroup;
 
-GType      thunar_shortcut_group_get_type               (void) G_GNUC_CONST;
+GType      thunar_shortcut_group_get_type                  (void) G_GNUC_CONST;
 
-GtkWidget *thunar_shortcut_group_new                    (const gchar         *label,
-                                                         ThunarShortcutType   accepted_types);
-gboolean   thunar_shortcut_group_try_add_shortcut       (ThunarShortcutGroup *group,
-                                                         ThunarShortcut      *shortcut);
-void       thunar_shortcut_group_unselect_shortcuts     (ThunarShortcutGroup *group,
-                                                         ThunarShortcut      *exception);
-void       thunar_shortcut_group_unprelight_shortcuts   (ThunarShortcutGroup *group,
-                                                         ThunarShortcut      *exception);
-void       thunar_shortcut_group_cancel_activations     (ThunarShortcutGroup *group,
-                                                         ThunarShortcut      *exception);
-void       thunar_shortcut_group_update_selection       (ThunarShortcutGroup *group,
-                                                         ThunarFile          *file);
-void       thunar_shortcut_group_remove_volume_shortcut (ThunarShortcutGroup *group,
-                                                         GVolume             *volume);
-void       thunar_shortcut_group_remove_mount_shortcut  (ThunarShortcutGroup *group,
-                                                         GMount              *mount);
-gboolean   thunar_shortcut_group_find_shortcut_by_file  (ThunarShortcutGroup *group,
-                                                         ThunarFile          *file,
-                                                         ThunarShortcut     **result);
+GtkWidget *thunar_shortcut_group_new                       (const gchar         *label,
+                                                            ThunarShortcutType   accepted_types);
+gboolean   thunar_shortcut_group_try_add_shortcut          (ThunarShortcutGroup *group,
+                                                            ThunarShortcut      *shortcut);
+void       thunar_shortcut_group_unselect_shortcuts        (ThunarShortcutGroup *group,
+                                                            ThunarShortcut      *exception);
+void       thunar_shortcut_group_unprelight_shortcuts      (ThunarShortcutGroup *group,
+                                                            ThunarShortcut      *exception);
+void       thunar_shortcut_group_cancel_activations        (ThunarShortcutGroup *group,
+                                                            ThunarShortcut      *exception);
+void       thunar_shortcut_group_update_selection          (ThunarShortcutGroup *group,
+                                                            ThunarFile          *file);
+void       thunar_shortcut_group_remove_volume_shortcut    (ThunarShortcutGroup *group,
+                                                            GVolume             *volume);
+void       thunar_shortcut_group_remove_mount_shortcut     (ThunarShortcutGroup *group,
+                                                            GMount              *mount);
+gboolean   thunar_shortcut_group_find_shortcut_by_file     (ThunarShortcutGroup *group,
+                                                            ThunarFile          *file,
+                                                            ThunarShortcut     **result);
+gboolean   thunar_shortcut_group_find_shortcut_by_location (ThunarShortcutGroup *group,
+                                                            GFile               *location,
+                                                            ThunarShortcut     **result);
 
 G_END_DECLS
 

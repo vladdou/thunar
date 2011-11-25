@@ -350,6 +350,7 @@ thunar_shortcut_type_get_type (void)
         { THUNAR_SHORTCUT_REGULAR_MOUNT,    "THUNAR_SHORTCUT_REGULAR_MOUNT",    "regular-mount",    },
         { THUNAR_SHORTCUT_ARCHIVE_MOUNT,    "THUNAR_SHORTCUT_ARCHIVE_MOUNT",    "archive-mount",    },
         { THUNAR_SHORTCUT_NETWORK_MOUNT,    "THUNAR_SHORTCUT_NETWORK_MOUNT",    "network-mount",    },
+        { THUNAR_SHORTCUT_DEVICE_MOUNT,     "THUNAR_SHORTCUT_DEVICE_MOUNT",     "device-mount",     },
         { 0,                                NULL,                               NULL,               },
       };
 

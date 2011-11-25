@@ -309,6 +309,7 @@ typedef enum
   THUNAR_SHORTCUT_REGULAR_MOUNT    = 1 << 5,
   THUNAR_SHORTCUT_ARCHIVE_MOUNT    = 1 << 6,
   THUNAR_SHORTCUT_NETWORK_MOUNT    = 1 << 7,
+  THUNAR_SHORTCUT_DEVICE_MOUNT     = 1 << 8,
 } ThunarShortcutType;
 
 GType thunar_shortcut_type_get_type (void) G_GNUC_CONST;

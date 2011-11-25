@@ -90,6 +90,8 @@ void               thunar_shortcut_unmount              (ThunarShortcut    *shor
 void               thunar_shortcut_disconnect           (ThunarShortcut    *shortcut);
 gboolean           thunar_shortcut_matches_file         (ThunarShortcut    *shortcut,
                                                          ThunarFile        *file);
+gboolean           thunar_shortcut_matches_location     (ThunarShortcut    *shortcut,
+                                                         GFile             *location);
 
 G_END_DECLS
 

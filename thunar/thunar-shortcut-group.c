@@ -591,13 +591,26 @@ thunar_shortcut_group_find_shortcut_by_file (ThunarShortcutGroup *group,
                                              ThunarFile          *file,
                                              ThunarShortcut     **result)
 {
-  ThunarShortcut *shortcut;
-  gboolean         has_shortcut = FALSE;
-  GList           *children;
-  GList           *iter;
-
   _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT_GROUP (group), FALSE);
   _thunar_return_val_if_fail (THUNAR_IS_FILE (file), FALSE);
+
+  return thunar_shortcut_group_find_shortcut_by_location (group, file->gfile, result);
+}
+
+
+
+gboolean
+thunar_shortcut_group_find_shortcut_by_location (ThunarShortcutGroup *group,
+                                                 GFile               *location,
+                                                 ThunarShortcut     **result)
+{
+  ThunarShortcut *shortcut;
+  gboolean        has_shortcut = FALSE;
+  GList          *children;
+  GList          *iter;
+
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT_GROUP (group), FALSE);
+  _thunar_return_val_if_fail (G_IS_FILE (location), FALSE);
 
   children = gtk_container_get_children (GTK_CONTAINER (group->shortcuts));
 
@@ -608,7 +621,7 @@ thunar_shortcut_group_find_shortcut_by_file (ThunarShortcutGroup *group,
     {
       shortcut = THUNAR_SHORTCUT (iter->data);
 
-      if (thunar_shortcut_matches_file (shortcut, file))
+      if (thunar_shortcut_matches_location (shortcut, location))
         {
           if (result != NULL)
             *result = shortcut;

@@ -505,7 +505,11 @@ thunar_shortcut_finalize (GObject *object)
     g_object_unref (shortcut->file);
 
   if (shortcut->volume != NULL)
-    g_object_unref (shortcut->volume);
+    {
+      g_signal_handlers_disconnect_matched (shortcut->volume, G_SIGNAL_MATCH_DATA,
+                                            0, 0, NULL, 0, shortcut);
+      g_object_unref (shortcut->volume);
+    }
 
   if (shortcut->mount != NULL)
     g_object_unref (shortcut->mount);
@@ -1111,8 +1115,9 @@ thunar_shortcut_name_changed (ThunarShortcut *shortcut)
 static void
 thunar_shortcut_volume_changed (ThunarShortcut *shortcut)
 {
-  GIcon *icon;
-  gchar *name;
+  GMount *mount;
+  GIcon  *icon;
+  gchar  *name;
 
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
 
@@ -1136,6 +1141,33 @@ thunar_shortcut_volume_changed (ThunarShortcut *shortcut)
       icon = g_volume_get_icon (shortcut->volume);
       thunar_shortcut_set_icon (shortcut, icon);
       g_object_unref (icon);
+
+      if (g_volume_can_eject (shortcut->volume))
+        {
+          gtk_widget_set_visible (shortcut->action_button, TRUE);
+        }
+      else
+        {
+          /* check if we have a mount now */
+          mount = g_volume_get_mount (shortcut->volume);
+          if (mount != NULL)
+            {
+              /* show the disconnect button if the mount is removable */
+              if (g_mount_can_unmount (mount) || g_mount_can_eject (mount))
+                gtk_widget_set_visible (shortcut->action_button, TRUE);
+              else
+                gtk_widget_set_visible (shortcut->action_button, FALSE);
+
+              /* release the mount */
+              g_object_unref (mount);
+            }
+          else
+            {
+              /* we neither have a removable volume nor a removabl mount,
+               * so hide the disconnect button */
+              gtk_widget_set_visible (shortcut->action_button, FALSE);
+            }
+        }
     }
   else
     {
@@ -1159,7 +1191,8 @@ thunar_shortcut_mount_changed (ThunarShortcut *shortcut)
   if (!thunar_shortcut_matches_types (shortcut,
                                       THUNAR_SHORTCUT_REGULAR_MOUNT 
                                       | THUNAR_SHORTCUT_ARCHIVE_MOUNT
-                                      | THUNAR_SHORTCUT_NETWORK_MOUNT))
+                                      | THUNAR_SHORTCUT_NETWORK_MOUNT
+                                      | THUNAR_SHORTCUT_DEVICE_MOUNT))
     {
       return;
     }
@@ -1210,6 +1243,7 @@ thunar_shortcut_shortcut_type_changed (ThunarShortcut *shortcut)
     case THUNAR_SHORTCUT_REGULAR_MOUNT:
     case THUNAR_SHORTCUT_ARCHIVE_MOUNT:
     case THUNAR_SHORTCUT_NETWORK_MOUNT:
+    case THUNAR_SHORTCUT_DEVICE_MOUNT:
       thunar_shortcut_mount_changed (shortcut);
       break;
 
@@ -1643,10 +1677,22 @@ thunar_shortcut_set_volume (ThunarShortcut *shortcut,
     return;
 
   if (shortcut->volume != NULL)
-    g_object_unref (shortcut->volume);
+    {
+      /* disconnect from the volume */
+      g_signal_handlers_disconnect_matched (volume, G_SIGNAL_MATCH_DATA,
+                                            0, 0, 0, NULL, shortcut);
+
+      g_object_unref (shortcut->volume);
+    }
 
   if (volume != NULL)
-    shortcut->volume = g_object_ref (volume);
+    {
+      shortcut->volume = g_object_ref (volume);
+
+      /* connect to the volume */
+      g_signal_connect_swapped (volume, "changed",
+                                G_CALLBACK (thunar_shortcut_volume_changed), shortcut);
+    }
   else
     shortcut->volume = NULL;
 
@@ -2086,8 +2132,6 @@ thunar_shortcut_unmount (ThunarShortcut *shortcut)
 
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
 
-  g_debug ("shortcut unmount");
-
   /* check if we are currently mounting/ejecting something */
   if (shortcut->state != THUNAR_SHORTCUT_STATE_NORMAL)
     {
@@ -2104,13 +2148,9 @@ thunar_shortcut_unmount (ThunarShortcut *shortcut)
 
   if (shortcut->mount != NULL)
     {
-      g_debug ("  have mount");
-
       /* only handle mounts that can be unmounted here */
       if (g_mount_can_unmount (shortcut->mount))
         {
-          g_debug ("  mount can unmount");
-
           /* start spinning */
           thunar_shortcut_set_spinning (shortcut, TRUE, THUNAR_SHORTCUT_STATE_EJECTING);
 
@@ -2303,17 +2343,29 @@ gboolean
 thunar_shortcut_matches_file (ThunarShortcut *shortcut,
                               ThunarFile     *file)
 {
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT (shortcut), FALSE);
+  _thunar_return_val_if_fail (THUNAR_IS_FILE (file), FALSE);
+
+  return thunar_shortcut_matches_location (shortcut, file->gfile);
+}
+
+
+
+gboolean
+thunar_shortcut_matches_location (ThunarShortcut *shortcut,
+                                  GFile          *location)
+{
   gboolean matches = FALSE;
   GVolume *shortcut_volume;
   GMount  *mount;
   GFile   *mount_point;
-  GFile   *shortcut_file;
+  GFile   *shortcut_location;
 
   _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT (shortcut), FALSE);
-  _thunar_return_val_if_fail (THUNAR_IS_FILE (file), FALSE);
+  _thunar_return_val_if_fail (G_IS_FILE (location), FALSE);
 
   /* get the file and volume of the view */
-  shortcut_file = thunar_shortcut_get_location (shortcut);
+  shortcut_location = thunar_shortcut_get_location (shortcut);
   shortcut_volume = thunar_shortcut_get_volume (shortcut);
 
   /* check if we have a volume */
@@ -2326,7 +2378,7 @@ thunar_shortcut_matches_file (ThunarShortcut *shortcut,
           mount_point = g_mount_get_root (mount);
 
           /* select the shortcut if the mount point and the selected file are equal */
-          if (g_file_equal (file->gfile, mount_point))
+          if (g_file_equal (location, mount_point))
             matches = TRUE;
 
           /* release mount point and mount */
@@ -2339,16 +2391,16 @@ thunar_shortcut_matches_file (ThunarShortcut *shortcut,
       mount_point = g_mount_get_root (shortcut->mount);
 
       /* select the shortcut if the mount point and the selected file are equal */
-      if (g_file_equal (file->gfile, mount_point))
+      if (g_file_equal (location, mount_point))
         matches = TRUE;
 
       /* release mount point and mount */
       g_object_unref (mount_point);
     }
-  else if (shortcut_file != NULL)
+  else if (shortcut_location != NULL)
     {
       /* select the shortcut if the bookmark and the selected file are equal */
-      if (g_file_equal (file->gfile, shortcut_file))
+      if (g_file_equal (location, shortcut_location))
         matches = TRUE;
     }
 

@@ -246,7 +246,8 @@ thunar_shortcuts_view_init (ThunarShortcutsView *view)
                                      THUNAR_SHORTCUT_REGULAR_VOLUME 
                                      | THUNAR_SHORTCUT_EJECTABLE_VOLUME 
                                      | THUNAR_SHORTCUT_REGULAR_MOUNT
-                                     | THUNAR_SHORTCUT_ARCHIVE_MOUNT);
+                                     | THUNAR_SHORTCUT_ARCHIVE_MOUNT
+                                     | THUNAR_SHORTCUT_DEVICE_MOUNT);
   gtk_box_pack_start (GTK_BOX (view->group_box), group, FALSE, TRUE, 0);
   gtk_widget_show (group);
 
@@ -801,32 +802,44 @@ thunar_shortcuts_view_mount_added (ThunarShortcutsView *view,
     {
       /* read information from the mount */
       location = g_mount_get_root (mount);
-      eject_icon = g_themed_icon_new ("media-eject");
 
-      /* determine the shortcut type */
-      if (g_file_has_uri_scheme (location, "file"))
-        shortcut_type = THUNAR_SHORTCUT_REGULAR_MOUNT;
-      else if (g_file_has_uri_scheme (location, "archive"))
-        shortcut_type = THUNAR_SHORTCUT_ARCHIVE_MOUNT;
-      else
-        shortcut_type = THUNAR_SHORTCUT_NETWORK_MOUNT;
+      /* skip gphoto2 mounts as those are always associated with a volume,
+       * only add a new shortcut if we have none for the mount point yet */
+      if (!g_file_has_uri_scheme (location, "gphoto2") 
+          && thunar_shortcuts_view_has_location (view, location))
+        {
+          /* create an eject icon */
+          eject_icon = g_themed_icon_new ("media-eject");
 
-      /* create a shortcut for the mount */
-      shortcut = g_object_new (THUNAR_TYPE_SHORTCUT,
-                               "shortcut-type", shortcut_type,
-                               "location", location,
-                               "mount", mount,
-                               "eject-icon", eject_icon,
-                               "hidden", FALSE,
-                               "mutable", FALSE,
-                               "persistent", FALSE,
-                               NULL);
+          /* determine the shortcut type */
+          if (g_file_has_uri_scheme (location, "file"))
+            shortcut_type = THUNAR_SHORTCUT_REGULAR_MOUNT;
+          else if (g_file_has_uri_scheme (location, "archive"))
+            shortcut_type = THUNAR_SHORTCUT_ARCHIVE_MOUNT;
+          else if (g_file_has_uri_scheme (location, "gphoto2"))
+            shortcut_type = THUNAR_SHORTCUT_DEVICE_MOUNT;
+          else
+            shortcut_type = THUNAR_SHORTCUT_NETWORK_MOUNT;
 
-      /* add the shortcut to the view */
-      thunar_shortcuts_view_add_shortcut (view, shortcut);
+          /* create a shortcut for the mount */
+          shortcut = g_object_new (THUNAR_TYPE_SHORTCUT,
+                                   "shortcut-type", shortcut_type,
+                                   "location", location,
+                                   "mount", mount,
+                                   "eject-icon", eject_icon,
+                                   "hidden", FALSE,
+                                   "mutable", FALSE,
+                                   "persistent", FALSE,
+                                   NULL);
 
-      /* release volume information */
-      g_object_unref (eject_icon);
+          /* add the shortcut to the view */
+          thunar_shortcuts_view_add_shortcut (view, shortcut);
+
+          /* release eject icon */
+          g_object_unref (eject_icon);
+        }
+
+      /* release the mount point */
       g_object_unref (location);
     }
 }
@@ -1356,6 +1369,32 @@ thunar_shortcuts_view_has_file (ThunarShortcutsView *view,
   g_list_free (groups);
 
   return has_file;
+}
+
+
+
+gboolean
+thunar_shortcuts_view_has_location (ThunarShortcutsView *view,
+                                    GFile               *location)
+{
+  gboolean has_location = FALSE;
+  GList   *groups;
+  GList   *iter;
+
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUTS_VIEW (view), FALSE);
+  _thunar_return_val_if_fail (G_IS_FILE (location), FALSE);
+
+  groups = gtk_container_get_children (GTK_CONTAINER (view->group_box));
+
+  for (iter = groups; !has_location && iter != NULL; iter = iter->next)
+    {
+      if (thunar_shortcut_group_find_shortcut_by_location (iter->data, location, NULL))
+        has_location = TRUE;
+    }
+
+  g_list_free (groups);
+
+  return has_location;
 }
 
 
