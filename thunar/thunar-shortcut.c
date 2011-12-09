@@ -232,6 +232,8 @@ struct _ThunarShortcut
   ThunarPreferences  *preferences;
   ThunarIconSize      icon_size;
 
+  ThunarShortcutState state;
+
   GCancellable       *cancellable;
 
   guint               drag_highlight : 1;
@@ -239,7 +241,7 @@ struct _ThunarShortcut
   guint               drop_data_ready : 1;
   GList              *drop_file_list;
 
-  ThunarShortcutState state;
+  gint                pressed_button;
 };
 
 
@@ -738,9 +740,18 @@ static gboolean
 thunar_shortcut_button_press_event (GtkWidget      *widget,
                                     GdkEventButton *event)
 {
-  GtkStateType state;
+  ThunarShortcut *shortcut = THUNAR_SHORTCUT (widget);
+  GtkStateType    state;
+  gboolean        result = FALSE;
 
   _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT (widget), FALSE);
+
+  /* reset the pressed button state */
+  shortcut->pressed_button = -1;
+
+  /* ignore double click events */
+  if (event->type == GDK_2BUTTON_PRESS)
+    return TRUE;
 
   /* determine the widget's state */
   state = gtk_widget_get_state (widget);
@@ -756,25 +767,23 @@ thunar_shortcut_button_press_event (GtkWidget      *widget,
       gtk_widget_grab_focus (widget);
     }
 
-  /* distinguish between left, right and middle click */
-  if (event->button == 1)
+  if ((event->button == 1 || event->button == 2)
+      && (event->state & GDK_CONTROL_MASK) == 0)
     {
-      /* resolve (e.g. mount) the shortcut and activate it */
-      if (gtk_widget_get_state (widget) == GTK_STATE_SELECTED)
-        thunar_shortcut_resolve_and_activate (THUNAR_SHORTCUT (widget), FALSE);
+      /* first or second mouse button pressed, handle this in the
+       * button release handler */
+      shortcut->pressed_button = event->button;
     }
   else if (event->button == 3)
     {
       /* emit the context menu signal */
-      g_signal_emit (widget, SIGNAL_CONTEXT_MENU, 0);
-    }
-  else if (event->button == 2)
-    {
-      /* TODO we don't handle middle-click events yet */
-      g_debug ("middle button press");
+      g_signal_emit (shortcut, shortcut_signals[SIGNAL_CONTEXT_MENU], 0);
+
+      /* we handled the event */
+      result = TRUE;
     }
 
-  return TRUE;
+  return result;
 }
 
 
@@ -783,23 +792,26 @@ static gboolean
 thunar_shortcut_button_release_event (GtkWidget      *widget,
                                       GdkEventButton *event)
 {
+  ThunarShortcut *shortcut = THUNAR_SHORTCUT (widget);
+
   _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT (widget), FALSE);
 
-  /* distinguish between left, right and middle-click */
-  if (event->button == 3)
+  /* check whether we have an event matching the pressed button */
+  if (shortcut->pressed_button == (gint) event->button)
     {
-      /* TODO abort the menu popup timeout created in reaction to 
-       * the right button press event */
-
-      /* emit the popup-menu signal */
-      g_signal_emit_by_name (widget, "context-menu");
+      /* open in the same window on left click, in a new window on middle click */
+      if (event->button == 1)
+        thunar_shortcut_resolve_and_activate (shortcut, FALSE);
+      else if (event->button == 2)
+        thunar_shortcut_resolve_and_activate (shortcut, TRUE);
 
       return TRUE;
     }
-  else
-    {
-      return FALSE;
-    }
+
+  /* reset the pressd button state */
+  shortcut->pressed_button = -1;
+
+  return FALSE;
 }
 
 
