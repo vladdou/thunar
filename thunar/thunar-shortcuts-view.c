@@ -806,7 +806,7 @@ thunar_shortcuts_view_mount_added (ThunarShortcutsView *view,
       /* skip gphoto2 mounts as those are always associated with a volume,
        * only add a new shortcut if we have none for the mount point yet */
       if (!g_file_has_uri_scheme (location, "gphoto2") 
-          && thunar_shortcuts_view_has_location (view, location))
+          && !thunar_shortcuts_view_has_location (view, location))
         {
           /* create an eject icon */
           eject_icon = g_themed_icon_new ("media-eject");
