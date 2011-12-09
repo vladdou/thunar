@@ -34,6 +34,7 @@
 #include <thunar/thunar-browser.h>
 #include <thunar/thunar-enum-types.h>
 #include <thunar/thunar-dialogs.h>
+#include <thunar/thunar-dnd.h>
 #include <thunar/thunar-file.h>
 #include <thunar/thunar-marshal.h>
 #include <thunar/thunar-preferences.h>
@@ -148,6 +149,7 @@ static void          thunar_shortcut_button_clicked          (ThunarShortcut    
                                                               GtkButton          *button);
 static gboolean      thunar_shortcut_matches_types           (ThunarShortcut     *shortcut,
                                                               ThunarShortcutType  types);
+static void          thunar_shortcut_update                  (ThunarShortcut     *shortcut);
 static void          thunar_shortcut_location_changed        (ThunarShortcut     *shortcut);
 static void          thunar_shortcut_file_changed            (ThunarShortcut     *shortcut);
 static void          thunar_shortcut_shortcut_type_changed   (ThunarShortcut     *shortcut);
@@ -812,6 +814,9 @@ thunar_shortcut_drag_data_received (GtkWidget        *widget,
                                     guint             timestamp)
 {
   ThunarShortcut *shortcut = THUNAR_SHORTCUT (widget);
+  GdkDragAction   actions;
+  GdkDragAction   action;
+  gboolean        success = FALSE;
 
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT (widget));
   _thunar_return_if_fail (GDK_IS_DRAG_CONTEXT (context));
@@ -841,19 +846,45 @@ thunar_shortcut_drag_data_received (GtkWidget        *widget,
       /* make sure we only handle text/uri-list */
       if (info == TARGET_TEXT_URI_LIST)
         {
-          if (shortcut->drop_file_list != NULL)
-            g_debug ("  have drop files, create bookmarks now");
-          else
-            g_debug ("  don't have drop files, abort drag and drop");
+          if (shortcut->file != NULL)
+            {
+              /* determine the drop actions */
+              actions = thunar_shortcut_compute_drop_actions (shortcut, context, 
+                                                              &action);
+
+              /* check whether the actions are supported */
+              if ((actions & (GDK_ACTION_COPY
+                              | GDK_ACTION_MOVE 
+                              | GDK_ACTION_LINK)) != 0)
+                {
+                  /* if necessary, ask the user what he wants to do */
+                  if (action == GDK_ACTION_ASK)
+                    {
+                      action = thunar_dnd_ask (widget,
+                                               shortcut->file,
+                                               shortcut->drop_file_list,
+                                               timestamp,
+                                               actions);
+                    }
+
+                  /* if we have a drop action, perform it now */
+                  if (action != 0)
+                    {
+                      success = thunar_dnd_perform (widget,
+                                                    shortcut->file,
+                                                    shortcut->drop_file_list,
+                                                    action,
+                                                    NULL);
+                    }
+                }
+            }
+
+          /* disable highlighting and release the drag data */
+          thunar_shortcut_drag_leave (widget, context, timestamp);
+
+          /* tell the peer that we handled the copy */
+          gtk_drag_finish (context, success, FALSE, timestamp);
         }
-
-      /* disable highlighting and release the drag data */
-      /* TODO we might have to delay this until the shortcut has been resolved */
-      thunar_shortcut_drag_leave (widget, context, timestamp);
-
-      /* tell the peer that we handled the copy */
-      /* TODO we might have to delay this until the shortcut has been resolved */
-      gtk_drag_finish (context, shortcut->drop_file_list != NULL, FALSE, timestamp);
     }
   else
     {
@@ -885,7 +916,7 @@ thunar_shortcut_drag_drop (GtkWidget      *widget,
       /* request the drag data from the source and perform the drop */
       gtk_drag_get_data (widget, context, target, timestamp);
 
-      return  TRUE;
+      return TRUE;
     }
   else
     {
@@ -993,16 +1024,15 @@ thunar_shortcut_compute_drop_actions (ThunarShortcut *shortcut,
                                           shortcut->drop_file_list,
                                           context,
                                           suggested_action);
-
-      g_debug ("  check whether %s accepts: move %s, copy %s, link %s, ask %s",
-               thunar_file_get_display_name (shortcut->file),
-               (actions & GDK_ACTION_MOVE) != 0 ? "yes" : "no",
-               (actions & GDK_ACTION_COPY) != 0 ? "yes" : "no",
-               (actions & GDK_ACTION_LINK) != 0 ? "yes" : "no",
-               (actions & GDK_ACTION_ASK ) != 0 ? "yes" : "no");
     }
-
-  /* TODO handle everything else */
+  else
+    {
+      /* we know nothing about the file, just report back that dropping
+       * here is impossible */
+      actions = 0;
+      if (suggested_action != NULL)
+        *suggested_action = 0;
+    }
 
   return actions;
 }
@@ -1292,41 +1322,166 @@ thunar_shortcut_matches_types (ThunarShortcut    *shortcut,
 
 
 static void
-thunar_shortcut_location_changed (ThunarShortcut *shortcut)
+thunar_shortcut_update (ThunarShortcut *shortcut)
 {
-  GIcon *icon;
-  gchar *uri;
-  gchar *base_name;
+  const gchar *display_name;
+  GIcon       *icon;
+  gchar       *base_name;
+  gchar       *name;
+  gchar       *uri;
 
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
 
-  /* only update the shortcut if this is a file shortcut */
-  if (!thunar_shortcut_matches_types (shortcut, 
-                                      THUNAR_SHORTCUT_REGULAR_FILE
-                                      | THUNAR_SHORTCUT_NETWORK_FILE
-                                      | THUNAR_SHORTCUT_TRASH_FILE))
+#if 0
+  thunar_shortcut_update_icon (shortcut);
+  thunar_shortcut_update_label (shortcut);
+  thunar_shortcut_update_button (shortcut);
+#endif
+
+  switch (shortcut->type)
     {
-      return;
+    case THUNAR_SHORTCUT_REGULAR_FILE:
+    case THUNAR_SHORTCUT_TRASH_FILE:
+    case THUNAR_SHORTCUT_NETWORK_FILE:
+      /* hide the action button */
+      gtk_widget_set_visible (shortcut->action_button, FALSE);
+
+      if (shortcut->file != NULL)
+        {
+          /* update the name of the shortcut */
+          display_name = thunar_file_get_display_name (shortcut->file);
+          thunar_shortcut_set_name (shortcut, display_name);
+
+          /* update the icon of the shortcut */
+          icon = thunar_file_get_icon (shortcut->file);
+          thunar_shortcut_set_icon (shortcut, icon);
+        }
+      else if (shortcut->location != NULL)
+        {
+          /* use the location base name as the default name */
+          uri = g_file_get_uri (shortcut->location);
+          base_name = g_filename_display_basename (uri);
+          thunar_shortcut_set_name (shortcut, base_name);
+          g_free (base_name);
+          g_free (uri);
+
+          /* use the folder icon as the default icon */
+          if (shortcut->icon != NULL)
+            {
+              icon = g_themed_icon_new ("folder");
+              thunar_shortcut_set_icon (shortcut, icon);
+              g_object_unref (icon);
+            }
+        }
+      else
+        {
+          if (shortcut->constructed)
+            _thunar_assert_not_reached ();
+        }
+      break;
+
+    case THUNAR_SHORTCUT_REGULAR_MOUNT:
+    case THUNAR_SHORTCUT_ARCHIVE_MOUNT:
+    case THUNAR_SHORTCUT_NETWORK_MOUNT:
+    case THUNAR_SHORTCUT_DEVICE_MOUNT:
+      /* check if we have a proper mount */
+      if (shortcut->mount != NULL)
+        {
+          /* update the name of the shortcut */
+          name = g_mount_get_name (shortcut->mount);
+          thunar_shortcut_set_name (shortcut, name);
+          g_free (name);
+
+          /* update the icon of the shortcut  */
+          icon = g_mount_get_icon (shortcut->mount);
+          thunar_shortcut_set_icon (shortcut, icon);
+          g_object_unref (icon);
+
+          /* update the action button */
+          if (g_mount_can_unmount (shortcut->mount)
+              || g_mount_can_eject (shortcut->mount))
+            {
+              gtk_widget_set_visible (shortcut->action_button, TRUE);
+            }
+          else
+            {
+              gtk_widget_set_visible (shortcut->action_button, FALSE);
+            }
+        }
+      else
+        {
+          if (shortcut->constructed)
+            _thunar_assert_not_reached ();
+        }
+      break;
+
+    case THUNAR_SHORTCUT_REGULAR_VOLUME:
+    case THUNAR_SHORTCUT_EJECTABLE_VOLUME:
+      /* check if we have a proper volume */
+      if (shortcut->volume != NULL)
+        {
+          /* update the name of the shortcut */
+          name = g_volume_get_name (shortcut->volume);
+          thunar_shortcut_set_name (shortcut, name);
+          g_free (name);
+
+          /* update the icon of the shortcut */
+          icon = g_volume_get_icon (shortcut->volume);
+          thunar_shortcut_set_icon (shortcut, icon);
+          g_object_unref (icon);
+
+          /* update the action button */
+          if (g_volume_can_eject (shortcut->volume))
+            {
+              gtk_widget_set_visible (shortcut->action_button, TRUE);
+            }
+          else
+            {
+              /* check if we have a mount now */
+              if (shortcut->mount != NULL)
+                {
+                  /* show the disconnect button if the mount is removable */
+                  if (g_mount_can_unmount (shortcut->mount)
+                      || g_mount_can_eject (shortcut->mount))
+                    {
+                      gtk_widget_set_visible (shortcut->action_button, TRUE);
+                    }
+                  else
+                    {
+                      gtk_widget_set_visible (shortcut->action_button, FALSE);
+                    }
+                }
+              else
+                {
+                  /* we neither have a removable volume nor a removable mount,
+                   * so hide the disconnect button */
+                  gtk_widget_set_visible (shortcut->action_button, FALSE);
+                }
+            }
+        }
+      else
+        {
+          if (shortcut->constructed)
+            _thunar_assert_not_reached ();
+        }
+      break;
+
+    default:
+      _thunar_assert_not_reached ();
+      break;
     }
-  
+}
+
+
+
+static void
+thunar_shortcut_location_changed (ThunarShortcut *shortcut)
+{
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
+
   /* check whether we have a location */
   if (shortcut->location != NULL)
     {
-      /* use the location base name as the default name */
-      uri = g_file_get_uri (shortcut->location);
-      base_name = g_filename_display_basename (uri);
-      thunar_shortcut_set_name (shortcut, base_name);
-      g_free (base_name);
-      g_free (uri);
-
-      /* use the folder icon as the default icon */
-      if (shortcut->icon == NULL)
-        {
-          icon = g_themed_icon_new ("folder");
-          thunar_shortcut_set_icon (shortcut, icon);
-          g_object_unref (icon);
-        }
-
       /* load additional file information asynchronously */
       thunar_browser_poke_location (THUNAR_BROWSER (shortcut),
                                     shortcut->location,
@@ -1334,12 +1489,9 @@ thunar_shortcut_location_changed (ThunarShortcut *shortcut)
                                     thunar_shortcut_resolve_location_finish,
                                     NULL);
     }
-  else
-    {
-      /* if this is reached, there is something wrong with the
-       * shortcut classification */
-      _thunar_assert (!shortcut->constructed);
-    }
+
+  /* update icon, label and action button */
+  thunar_shortcut_update (shortcut);
 }
 
 
@@ -1347,30 +1499,10 @@ thunar_shortcut_location_changed (ThunarShortcut *shortcut)
 static void
 thunar_shortcut_file_changed (ThunarShortcut *shortcut)
 {
-  const gchar *display_name;
-  GIcon       *icon;
-
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
 
-  /* only update the information if this is a file shortcut */
-  if (!thunar_shortcut_matches_types (shortcut, 
-                                      THUNAR_SHORTCUT_REGULAR_FILE
-                                      | THUNAR_SHORTCUT_NETWORK_FILE))
-    {
-      return;
-    }
-
-  /* update only if we have a file */
-  if (shortcut->file != NULL)
-    {
-      /* update the name of the shortcut */
-      display_name = thunar_file_get_display_name (shortcut->file);
-      thunar_shortcut_set_name (shortcut, display_name);
-
-      /* update the icon of the shortcut */
-      icon = thunar_file_get_icon (shortcut->file);
-      thunar_shortcut_set_icon (shortcut, icon);
-    }
+  /* update icon, label and action button */
+  thunar_shortcut_update (shortcut);
 }
 
 
@@ -1396,65 +1528,21 @@ static void
 thunar_shortcut_volume_changed (ThunarShortcut *shortcut)
 {
   GMount *mount;
-  GIcon  *icon;
-  gchar  *name;
 
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
-
-  /* don't update if this is not a volume */
-  if (!thunar_shortcut_matches_types (shortcut,
-                                      THUNAR_SHORTCUT_REGULAR_VOLUME
-                                      | THUNAR_SHORTCUT_EJECTABLE_VOLUME))
-    {
-      return;
-    }
 
   /* only update if we have a volume */
   if (shortcut->volume != NULL)
     {
-      /* update the name of the shortcut */
-      name = g_volume_get_name (shortcut->volume);
-      thunar_shortcut_set_name (shortcut, name);
-      g_free (name);
-
-      /* update the icon of the shortcut */
-      icon = g_volume_get_icon (shortcut->volume);
-      thunar_shortcut_set_icon (shortcut, icon);
-      g_object_unref (icon);
-
-      if (g_volume_can_eject (shortcut->volume))
-        {
-          gtk_widget_set_visible (shortcut->action_button, TRUE);
-        }
-      else
-        {
-          /* check if we have a mount now */
-          mount = g_volume_get_mount (shortcut->volume);
-          if (mount != NULL)
-            {
-              /* show the disconnect button if the mount is removable */
-              if (g_mount_can_unmount (mount) || g_mount_can_eject (mount))
-                gtk_widget_set_visible (shortcut->action_button, TRUE);
-              else
-                gtk_widget_set_visible (shortcut->action_button, FALSE);
-
-              /* release the mount */
-              g_object_unref (mount);
-            }
-          else
-            {
-              /* we neither have a removable volume nor a removabl mount,
-               * so hide the disconnect button */
-              gtk_widget_set_visible (shortcut->action_button, FALSE);
-            }
-        }
+      /* set the mount if we have one now */
+      mount = g_volume_get_mount (shortcut->volume);
+      thunar_shortcut_set_mount (shortcut, mount);
+      if (mount != NULL)
+        g_object_unref (mount);
     }
-  else
-    {
-      /* if this is reached, there is something wrong the 
-       * shortcut classification */
-      _thunar_assert(!shortcut->constructed);
-    }
+
+  /* update icon, label and action button */
+  thunar_shortcut_update (shortcut);
 }
 
 
@@ -1462,46 +1550,21 @@ thunar_shortcut_volume_changed (ThunarShortcut *shortcut)
 static void
 thunar_shortcut_mount_changed (ThunarShortcut *shortcut)
 {
-  GIcon *icon;
-  gchar *name;
+  GFile *mount_point;
 
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
-
-  /* don't update the information if this is not a mount shortcut */
-  if (!thunar_shortcut_matches_types (shortcut,
-                                      THUNAR_SHORTCUT_REGULAR_MOUNT 
-                                      | THUNAR_SHORTCUT_ARCHIVE_MOUNT
-                                      | THUNAR_SHORTCUT_NETWORK_MOUNT
-                                      | THUNAR_SHORTCUT_DEVICE_MOUNT))
-    {
-      return;
-    }
 
   /* only update if we have a mount */
   if (shortcut->mount != NULL)
     {
-      /* update the name of the shortcut */
-      name = g_mount_get_name (shortcut->mount);
-      thunar_shortcut_set_name (shortcut, name);
-      g_free (name);
-
-      /* update the icon of the shortcut  */
-      icon = g_mount_get_icon (shortcut->mount);
-      thunar_shortcut_set_icon (shortcut, icon);
-      g_object_unref (icon);
-
-      /* update the action button */
-      if (g_mount_can_unmount (shortcut->mount) || g_mount_can_eject (shortcut->mount))
-        gtk_widget_set_visible (shortcut->action_button, TRUE);
-      else
-        gtk_widget_set_visible (shortcut->action_button, FALSE);
+      /* resolve the location */
+      mount_point = g_mount_get_root (shortcut->mount);
+      thunar_shortcut_set_location (shortcut, mount_point);
+      g_object_unref (mount_point);
     }
-  else
-    {
-      /* if this is reached, there is something wrong the 
-       * shortcut classification */
-      _thunar_assert (!shortcut->constructed);
-    }
+
+  /* update icon, label and action button */
+  thunar_shortcut_update (shortcut);
 }
 
 
@@ -1622,7 +1685,13 @@ thunar_shortcut_mount_unmount_finish (GObject      *object,
   /* stop spinning */
   thunar_shortcut_set_spinning (shortcut, FALSE, THUNAR_SHORTCUT_STATE_NORMAL);
 
-  if (!g_mount_unmount_with_operation_finish (mount, result, &error))
+  if (g_mount_unmount_with_operation_finish (mount, result, &error))
+    {
+      /* reset the file information */
+      thunar_shortcut_set_location (shortcut, NULL);
+      thunar_shortcut_set_file (shortcut, NULL);
+    }
+  else
     {
       name = thunar_shortcut_get_display_name (shortcut);
       thunar_dialogs_show_error (GTK_WIDGET (shortcut), error,
@@ -1650,7 +1719,13 @@ thunar_shortcut_mount_eject_finish (GObject      *object,
   _thunar_return_if_fail (G_IS_MOUNT (mount));
   _thunar_return_if_fail (G_IS_ASYNC_RESULT (result));
 
-  if (!g_mount_eject_with_operation_finish (mount, result, &error))
+  if (g_mount_eject_with_operation_finish (mount, result, &error))
+    {
+      /* reset the file information */
+      thunar_shortcut_set_location (shortcut, NULL);
+      thunar_shortcut_set_file (shortcut, NULL);
+    }
+  else
     {
       name = thunar_shortcut_get_display_name (shortcut);
       thunar_dialogs_show_error (GTK_WIDGET (shortcut), error,
@@ -1678,7 +1753,14 @@ thunar_shortcut_volume_eject_finish (GObject      *object,
   /* stop spinning */
   thunar_shortcut_set_spinning (shortcut, FALSE, THUNAR_SHORTCUT_STATE_NORMAL);
 
-  if (!g_volume_eject_with_operation_finish (volume, result, &error))
+  if (g_volume_eject_with_operation_finish (volume, result, &error))
+    {
+      /* reset the mount and file information */
+      thunar_shortcut_set_mount (shortcut, NULL);
+      thunar_shortcut_set_location (shortcut, NULL);
+      thunar_shortcut_set_file (shortcut, NULL);
+    }
+  else
     {
       name = thunar_shortcut_get_display_name (shortcut);
       thunar_dialogs_show_error (GTK_WIDGET (shortcut), error,
@@ -1818,11 +1900,24 @@ thunar_shortcut_set_spinning (ThunarShortcut     *shortcut,
       gtk_widget_hide (shortcut->spinner);
       gtk_widget_hide (shortcut->action_button);
 
-      /* assume the mount and volume have changed which will make 
-       * the action button visible again if the volume or mount is 
-       * mounted and can be ejected */
-      thunar_shortcut_mount_changed (shortcut);
-      thunar_shortcut_volume_changed (shortcut);
+      if (thunar_shortcut_matches_types (shortcut,
+                                         THUNAR_SHORTCUT_REGULAR_MOUNT
+                                         | THUNAR_SHORTCUT_ARCHIVE_MOUNT
+                                         | THUNAR_SHORTCUT_NETWORK_MOUNT
+                                         | THUNAR_SHORTCUT_DEVICE_MOUNT))
+        {
+          /* assume the mount has changed which will make the action button 
+           * visible again if the mount can be ejected */
+          thunar_shortcut_mount_changed (shortcut);
+        }
+      else if (thunar_shortcut_matches_types (shortcut,
+                                              THUNAR_SHORTCUT_REGULAR_VOLUME
+                                              | THUNAR_SHORTCUT_EJECTABLE_VOLUME))
+        {
+          /* assume the volume has changed which will make the action button 
+           * visible again if the volume can be ejected */
+          thunar_shortcut_volume_changed (shortcut);
+        }
     }
 }
 
@@ -2347,16 +2442,7 @@ thunar_shortcut_resolve_and_activate (ThunarShortcut *shortcut,
       g_cancellable_reset (shortcut->cancellable);
     }
 
-  if (shortcut->volume != NULL)
-    {
-      /* activate the spinner */
-      thunar_shortcut_set_spinning (shortcut, TRUE, THUNAR_SHORTCUT_STATE_RESOLVING);
-
-      thunar_browser_poke_volume (THUNAR_BROWSER (shortcut), shortcut->volume,
-                                  shortcut, thunar_shortcut_poke_volume_finish,
-                                  GUINT_TO_POINTER (open_in_new_window));
-    }
-  else if (shortcut->file != NULL)
+  if (shortcut->file != NULL)
     {
       /* activate the spinner */
       thunar_shortcut_set_spinning (shortcut, TRUE, THUNAR_SHORTCUT_STATE_RESOLVING);
@@ -2373,6 +2459,15 @@ thunar_shortcut_resolve_and_activate (ThunarShortcut *shortcut,
       thunar_browser_poke_location (THUNAR_BROWSER (shortcut), shortcut->location,
                                     shortcut, thunar_shortcut_poke_location_finish,
                                     GUINT_TO_POINTER (open_in_new_window));
+    }
+  else if (shortcut->volume != NULL)
+    {
+      /* activate the spinner */
+      thunar_shortcut_set_spinning (shortcut, TRUE, THUNAR_SHORTCUT_STATE_RESOLVING);
+
+      thunar_browser_poke_volume (THUNAR_BROWSER (shortcut), shortcut->volume,
+                                  shortcut, thunar_shortcut_poke_volume_finish,
+                                  GUINT_TO_POINTER (open_in_new_window));
     }
   else
     {
@@ -2434,8 +2529,6 @@ thunar_shortcut_unmount (ThunarShortcut *shortcut)
           /* start spinning */
           thunar_shortcut_set_spinning (shortcut, TRUE, THUNAR_SHORTCUT_STATE_EJECTING);
 
-          g_debug ("  unmount now");
-
           /* try unmounting the mount */
           g_mount_unmount_with_operation (shortcut->mount,
                                           G_MOUNT_UNMOUNT_NONE,
@@ -2447,22 +2540,15 @@ thunar_shortcut_unmount (ThunarShortcut *shortcut)
     }
   else if (shortcut->volume != NULL)
     {
-      g_debug ("  have volume");
       mount = g_volume_get_mount (shortcut->volume);
       if (mount != NULL)
         {
-          g_debug ("  have mount");
-
           /* only handle mounts that can be unmounted here */
           if (g_mount_can_unmount(mount))
             {
-              g_debug ("  can unmount");
-
               /* start spinning */
               thunar_shortcut_set_spinning (shortcut, TRUE,
                                             THUNAR_SHORTCUT_STATE_EJECTING);
-
-              g_debug ("  unmount now");
 
               /* try unmounting the mount */
               g_mount_unmount_with_operation (mount,
@@ -2499,8 +2585,6 @@ thunar_shortcut_disconnect (ThunarShortcut *shortcut)
 
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
 
-  g_debug ("disconnect shortcut");
-
   /* check if we are currently mounting/ejecting something */
   if (shortcut->state != THUNAR_SHORTCUT_STATE_NORMAL)
     {
@@ -2517,17 +2601,11 @@ thunar_shortcut_disconnect (ThunarShortcut *shortcut)
 
   if (shortcut->mount != NULL)
     {
-      g_debug ("  have mount");
-
       /* distinguish between ejectable and unmountable mounts */
       if (g_mount_can_eject (shortcut->mount))
         {
-          g_debug ("  can eject");
-
           /* start spinning */
           thunar_shortcut_set_spinning (shortcut, TRUE, THUNAR_SHORTCUT_STATE_EJECTING);
-
-          g_debug ("  eject now");
 
           /* try ejecting the mount */
           g_mount_eject_with_operation (shortcut->mount,
