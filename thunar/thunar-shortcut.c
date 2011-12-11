@@ -147,8 +147,10 @@ static void          thunar_shortcut_button_state_changed    (ThunarShortcut    
                                                               GtkWidget          *button);
 static void          thunar_shortcut_button_clicked          (ThunarShortcut     *shortcut,
                                                               GtkButton          *button);
+#if 0
 static gboolean      thunar_shortcut_matches_types           (ThunarShortcut     *shortcut,
                                                               ThunarShortcutType  types);
+#endif
 static void          thunar_shortcut_update                  (ThunarShortcut     *shortcut);
 static void          thunar_shortcut_location_changed        (ThunarShortcut     *shortcut);
 static void          thunar_shortcut_file_changed            (ThunarShortcut     *shortcut);
@@ -233,8 +235,6 @@ struct _ThunarShortcut
   ThunarIconSize      icon_size;
 
   ThunarShortcutState state;
-
-  GCancellable       *cancellable;
 
   guint               drag_highlight : 1;
   guint               drop_occurred : 1;
@@ -441,9 +441,6 @@ thunar_shortcut_init (ThunarShortcut *shortcut)
 {
   GtkWidget *box;
 
-  /* create a cancellable for aborting mount/unmount operations */
-  shortcut->cancellable = g_cancellable_new ();
-
   /* set the shortcut state to normal */
   shortcut->state = THUNAR_SHORTCUT_STATE_NORMAL;
 
@@ -547,10 +544,6 @@ thunar_shortcut_finalize (GObject *object)
   /* release the spinner and action image */
   g_object_unref (shortcut->spinner);
   g_object_unref (shortcut->action_image);
-
-  /* release the cancellable */
-  g_cancellable_cancel (shortcut->cancellable);
-  g_object_unref (shortcut->cancellable);
 
   /* release the preferences */
   g_object_unref (shortcut->preferences);
@@ -1307,22 +1300,15 @@ thunar_shortcut_button_clicked (ThunarShortcut *shortcut,
 {
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
 
-  /* check if we are currently mounting/ejecting something */
-  if (shortcut->state != THUNAR_SHORTCUT_STATE_NORMAL)
-    {
-      /* abort the mount/eject process */
-      g_cancellable_cancel (shortcut->cancellable);
-
-      /* we're done, no further processing please */
-      return;
-    }
-
-  /* disconnect the shortcut */
-  thunar_shortcut_disconnect (shortcut);
+  /* disconnect the shortcut if we are not busy resolving, mounting,
+   * unmounting, or ejecting */
+  if (shortcut->state == THUNAR_SHORTCUT_STATE_NORMAL)
+    thunar_shortcut_disconnect (shortcut);
 }
 
 
 
+#if 0
 static gboolean
 thunar_shortcut_matches_types (ThunarShortcut    *shortcut,
                                ThunarShortcutType types)
@@ -1330,6 +1316,7 @@ thunar_shortcut_matches_types (ThunarShortcut    *shortcut,
   _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT (shortcut), FALSE);
   return (shortcut->type & types) != 0;
 }
+#endif
 
 
 
@@ -1343,12 +1330,6 @@ thunar_shortcut_update (ThunarShortcut *shortcut)
   gchar       *uri;
 
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
-
-#if 0
-  thunar_shortcut_update_icon (shortcut);
-  thunar_shortcut_update_label (shortcut);
-  thunar_shortcut_update_button (shortcut);
-#endif
 
   switch (shortcut->type)
     {
@@ -1367,6 +1348,12 @@ thunar_shortcut_update (ThunarShortcut *shortcut)
           /* update the icon of the shortcut */
           icon = thunar_file_get_icon (shortcut->file);
           thunar_shortcut_set_icon (shortcut, icon);
+
+          if (thunar_file_get_kind (shortcut->file) == G_FILE_TYPE_MOUNTABLE)
+            {
+              g_debug ("%s is mountable",
+                       display_name);
+            }
         }
       else if (shortcut->location != NULL)
         {
@@ -1410,6 +1397,17 @@ thunar_shortcut_update (ThunarShortcut *shortcut)
           g_object_unref (icon);
 
           /* update the action button */
+          if (g_mount_can_unmount (shortcut->mount)
+              || g_mount_can_eject (shortcut->mount))
+            {
+              gtk_widget_set_visible (shortcut->action_button, TRUE);
+            }
+          else
+            {
+              gtk_widget_set_visible (shortcut->action_button, FALSE);
+            }
+
+          /* show the disconnect button if the mount is removable */
           if (g_mount_can_unmount (shortcut->mount)
               || g_mount_can_eject (shortcut->mount))
             {
@@ -1674,6 +1672,8 @@ thunar_shortcut_resolve_location_finish (ThunarBrowser *browser,
   _thunar_return_if_fail (file == NULL || THUNAR_IS_FILE (file));
   _thunar_return_if_fail (target_file == NULL || THUNAR_IS_FILE (target_file));
 
+  /* TODO handle and show the error? */
+
   /* assign the file to the shortcut */
   thunar_shortcut_set_file (shortcut, target_file);
 }
@@ -1703,13 +1703,14 @@ thunar_shortcut_mount_unmount_finish (GObject      *object,
       thunar_shortcut_set_location (shortcut, NULL);
       thunar_shortcut_set_file (shortcut, NULL);
     }
-  else
+  else if (!(error->domain == G_IO_ERROR && error->code == G_IO_ERROR_CANCELLED))
     {
       name = thunar_shortcut_get_display_name (shortcut);
       thunar_dialogs_show_error (GTK_WIDGET (shortcut), error,
                                  _("Failed to eject \"%s\""), name);
-      g_error_free (error);
     }
+
+  g_clear_error (&error);
 }
 
 
@@ -1736,14 +1737,18 @@ thunar_shortcut_mount_eject_finish (GObject      *object,
       /* reset the file information */
       thunar_shortcut_set_location (shortcut, NULL);
       thunar_shortcut_set_file (shortcut, NULL);
+
+      /* hide the shortcut */
+      gtk_widget_hide (GTK_WIDGET (shortcut));
     }
-  else
+  else if (!(error->domain == G_IO_ERROR && error->code == G_IO_ERROR_CANCELLED))
     {
       name = thunar_shortcut_get_display_name (shortcut);
       thunar_dialogs_show_error (GTK_WIDGET (shortcut), error,
                                  _("Failed to eject \"%s\""), name);
-      g_error_free (error);
     }
+
+  g_clear_error (&error);
 }
 
 
@@ -1771,14 +1776,18 @@ thunar_shortcut_volume_eject_finish (GObject      *object,
       thunar_shortcut_set_mount (shortcut, NULL);
       thunar_shortcut_set_location (shortcut, NULL);
       thunar_shortcut_set_file (shortcut, NULL);
+
+      /* hide the shortcut */
+      gtk_widget_hide (GTK_WIDGET (shortcut));
     }
-  else
+  else if (!(error->domain == G_IO_ERROR && error->code == G_IO_ERROR_CANCELLED))
     {
       name = thunar_shortcut_get_display_name (shortcut);
       thunar_dialogs_show_error (GTK_WIDGET (shortcut), error,
                                  _("Failed to eject \"%s\""), name);
-      g_error_free (error);
     }
+
+  g_clear_error (&error);
 }
 
 
@@ -1806,7 +1815,7 @@ thunar_shortcut_poke_volume_finish (ThunarBrowser *browser,
       g_signal_emit (shortcut, shortcut_signals[SIGNAL_ACTIVATED], 0, file,
                      open_in_new_window);
     }
-  else
+  else if (!(error->domain == G_IO_ERROR && error->code == G_IO_ERROR_CANCELLED))
     {
       name = thunar_shortcut_get_display_name (shortcut);
       thunar_dialogs_show_error (GTK_WIDGET (shortcut), error,
@@ -1839,7 +1848,7 @@ thunar_shortcut_poke_file_finish (ThunarBrowser *browser,
       g_signal_emit (shortcut, shortcut_signals[SIGNAL_ACTIVATED], 0, target_file, 
                      open_in_new_window);
     }
-  else
+  else if (!(error->domain == G_IO_ERROR && error->code == G_IO_ERROR_CANCELLED))
     {
       name = thunar_shortcut_get_display_name (shortcut);
       thunar_dialogs_show_error (GTK_WIDGET (shortcut), error,
@@ -1874,7 +1883,7 @@ thunar_shortcut_poke_location_finish (ThunarBrowser *browser,
       g_signal_emit (shortcut, shortcut_signals[SIGNAL_ACTIVATED], 0, target_file, 
                      open_in_new_window);
     }
-  else
+  else if (!(error->domain == G_IO_ERROR && error->code == G_IO_ERROR_CANCELLED))
     {
       name = thunar_shortcut_get_display_name (shortcut);
       thunar_dialogs_show_error (GTK_WIDGET (shortcut), error,
@@ -1894,11 +1903,9 @@ thunar_shortcut_set_spinning (ThunarShortcut     *shortcut,
   /* apply the new state */
   shortcut->state = new_state;
 
-  /* reset the cancelable so that we can use it to cancel the process */
-  g_cancellable_reset (shortcut->cancellable);
-
   if (spinning)
     {
+      gtk_widget_set_sensitive (shortcut->action_button, FALSE);
       gtk_button_set_image (GTK_BUTTON (shortcut->action_button), shortcut->spinner);
       gtk_spinner_start (GTK_SPINNER (shortcut->spinner));
       gtk_widget_show (shortcut->spinner);
@@ -1906,30 +1913,15 @@ thunar_shortcut_set_spinning (ThunarShortcut     *shortcut,
     }
   else
     {
+      gtk_widget_set_sensitive (shortcut->action_button, TRUE);
       gtk_button_set_image (GTK_BUTTON (shortcut->action_button),
                             shortcut->action_image);
       gtk_spinner_stop (GTK_SPINNER (shortcut->spinner));
       gtk_widget_hide (shortcut->spinner);
       gtk_widget_hide (shortcut->action_button);
 
-      if (thunar_shortcut_matches_types (shortcut,
-                                         THUNAR_SHORTCUT_REGULAR_MOUNT
-                                         | THUNAR_SHORTCUT_ARCHIVE_MOUNT
-                                         | THUNAR_SHORTCUT_NETWORK_MOUNT
-                                         | THUNAR_SHORTCUT_DEVICE_MOUNT))
-        {
-          /* assume the mount has changed which will make the action button 
-           * visible again if the mount can be ejected */
-          thunar_shortcut_mount_changed (shortcut);
-        }
-      else if (thunar_shortcut_matches_types (shortcut,
-                                              THUNAR_SHORTCUT_REGULAR_VOLUME
-                                              | THUNAR_SHORTCUT_EJECTABLE_VOLUME))
-        {
-          /* assume the volume has changed which will make the action button 
-           * visible again if the volume can be ejected */
-          thunar_shortcut_volume_changed (shortcut);
-        }
+      /* update icon, label and action button of the shortcut */
+      thunar_shortcut_update (shortcut);
     }
 }
 
@@ -2446,13 +2438,16 @@ thunar_shortcut_resolve_and_activate (ThunarShortcut *shortcut,
 {
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
 
-  /* check if we are currently mounting/ejecting something */
-  if (shortcut->state != THUNAR_SHORTCUT_STATE_NORMAL)
-    {
-      /* abort the current mount/eject process */
-      g_cancellable_cancel (shortcut->cancellable);
-      g_cancellable_reset (shortcut->cancellable);
-    }
+  /* do nothing if we are already resolving */
+  if (shortcut->state == THUNAR_SHORTCUT_STATE_RESOLVING)
+    return;
+
+  /* do nothing if we area unmounting/ejecting */
+  /* TODO make sure the item becomes insensitive as soon as we are
+   * unmounting/ejecting. then this function will no longer be 
+   * called and this check can be removed */
+  if (shortcut->state == THUNAR_SHORTCUT_STATE_EJECTING)
+    return;
 
   if (shortcut->file != NULL)
     {
@@ -2519,13 +2514,15 @@ thunar_shortcut_unmount (ThunarShortcut *shortcut)
 
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
 
-  /* check if we are currently mounting/ejecting something */
-  if (shortcut->state != THUNAR_SHORTCUT_STATE_NORMAL)
-    {
-      /* abort the current mount/eject process */
-      g_cancellable_cancel (shortcut->cancellable);
-      g_cancellable_reset (shortcut->cancellable);
-    }
+  /* do nothing if we are already unmounting/ejecting */
+  if (shortcut->state == THUNAR_SHORTCUT_STATE_EJECTING)
+    return;
+
+  /* do nothing if we are resolving/mounting */
+  /* TODO we need to make sure no unmount/eject action can be
+   * trigger via the GUI whenever we are resolving/mounting */
+  if (shortcut->state == THUNAR_SHORTCUT_STATE_RESOLVING)
+    return;
 
   /* create a mount operation */
   toplevel = gtk_widget_get_toplevel (GTK_WIDGET (shortcut));
@@ -2545,7 +2542,7 @@ thunar_shortcut_unmount (ThunarShortcut *shortcut)
           g_mount_unmount_with_operation (shortcut->mount,
                                           G_MOUNT_UNMOUNT_NONE,
                                           mount_operation,
-                                          shortcut->cancellable,
+                                          NULL,
                                           thunar_shortcut_mount_unmount_finish,
                                           shortcut);
         }
@@ -2566,7 +2563,7 @@ thunar_shortcut_unmount (ThunarShortcut *shortcut)
               g_mount_unmount_with_operation (mount,
                                               G_MOUNT_UNMOUNT_NONE,
                                               mount_operation,
-                                              shortcut->cancellable,
+                                              NULL,
                                               thunar_shortcut_mount_unmount_finish,
                                               shortcut);
             }
@@ -2597,13 +2594,15 @@ thunar_shortcut_disconnect (ThunarShortcut *shortcut)
 
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
 
-  /* check if we are currently mounting/ejecting something */
-  if (shortcut->state != THUNAR_SHORTCUT_STATE_NORMAL)
-    {
-      /* abort the current mount/eject process */
-      g_cancellable_cancel (shortcut->cancellable);
-      g_cancellable_reset (shortcut->cancellable);
-    }
+  /* do nothing if we are already unmounting/ejecting */
+  if (shortcut->state == THUNAR_SHORTCUT_STATE_EJECTING)
+    return;
+
+  /* do nothing if we are resolving/mounting */
+  /* TODO we need to make sure no unmount/eject action can be
+   * trigger via the GUI whenever we are resolving/mounting */
+  if (shortcut->state == THUNAR_SHORTCUT_STATE_RESOLVING)
+    return;
 
   /* create a mount operation */
   toplevel = gtk_widget_get_toplevel (GTK_WIDGET (shortcut));
@@ -2623,7 +2622,7 @@ thunar_shortcut_disconnect (ThunarShortcut *shortcut)
           g_mount_eject_with_operation (shortcut->mount,
                                         G_MOUNT_UNMOUNT_NONE,
                                         mount_operation,
-                                        shortcut->cancellable,
+                                        NULL,
                                         thunar_shortcut_mount_eject_finish,
                                         shortcut);
         }
@@ -2636,7 +2635,7 @@ thunar_shortcut_disconnect (ThunarShortcut *shortcut)
           g_mount_unmount_with_operation (shortcut->mount,
                                           G_MOUNT_UNMOUNT_NONE,
                                           mount_operation,
-                                          shortcut->cancellable,
+                                          NULL,
                                           thunar_shortcut_mount_unmount_finish,
                                           shortcut);
         }
@@ -2652,7 +2651,7 @@ thunar_shortcut_disconnect (ThunarShortcut *shortcut)
           g_volume_eject_with_operation (shortcut->volume,
                                          G_MOUNT_UNMOUNT_NONE,
                                          mount_operation,
-                                         shortcut->cancellable,
+                                         NULL,
                                          thunar_shortcut_volume_eject_finish,
                                          shortcut);
         }
@@ -2672,7 +2671,7 @@ thunar_shortcut_disconnect (ThunarShortcut *shortcut)
                   g_mount_unmount_with_operation (mount,
                                                   G_MOUNT_UNMOUNT_NONE,
                                                   mount_operation,
-                                                  shortcut->cancellable,
+                                                  NULL,
                                                   thunar_shortcut_mount_unmount_finish,
                                                   shortcut);
                 }
@@ -2686,7 +2685,7 @@ thunar_shortcut_disconnect (ThunarShortcut *shortcut)
                   g_mount_unmount_with_operation (mount,
                                                   G_MOUNT_UNMOUNT_NONE,
                                                   mount_operation,
-                                                  shortcut->cancellable,
+                                                  NULL,
                                                   thunar_shortcut_mount_unmount_finish,
                                                   shortcut);
                 }
