@@ -1,6 +1,6 @@
 /* vi:set et ai sw=2 sts=2 ts=2: */
 /*-
- * Copyright (c) 2009 Jannis Pohlmann <jannis@xfce.org>
+ * Copyright (c) 2009-2011 Jannis Pohlmann <jannis@xfce.org>
  *
  * This program is free software; you can redistribute it and/or 
  * modify it under the terms of the GNU General Public License as
@@ -298,6 +298,8 @@ thunar_browser_poke_mountable_finish (GObject      *object,
 
       thunar_browser_poke_file_data_free (poke_data);
     }
+
+  g_clear_error (&error);
 }
 
 
@@ -594,8 +596,6 @@ thunar_browser_poke_volume_finish (GObject      *object,
           if (error->code == G_IO_ERROR_ALREADY_MOUNTED)
             g_clear_error (&error);
         }
-
-      thunar_browser_poke_volume_data_free (poke_data);
     }
 
   if (error == NULL)
