@@ -76,16 +76,15 @@ static void     thunar_shortcut_group_apply_indentation (ThunarShortcutGroup    
 
 struct _ThunarShortcutGroupClass
 {
-  GtkEventBoxClass __parent__;
+  GtkExpanderClass __parent__;
 };
 
 struct _ThunarShortcutGroup
 {
-  GtkEventBox        __parent__;
+  GtkExpander        __parent__;
 
   ThunarShortcutType accepted_types;
 
-  GtkWidget         *expander;
   GtkWidget         *shortcuts;
 
   guint              flash_idle_id;
@@ -94,7 +93,7 @@ struct _ThunarShortcutGroup
 
 
 
-G_DEFINE_TYPE (ThunarShortcutGroup, thunar_shortcut_group, GTK_TYPE_EVENT_BOX)
+G_DEFINE_TYPE (ThunarShortcutGroup, thunar_shortcut_group, GTK_TYPE_EXPANDER)
 
 
 
@@ -149,23 +148,13 @@ thunar_shortcut_group_class_init (ThunarShortcutGroupClass *klass)
 static void
 thunar_shortcut_group_init (ThunarShortcutGroup *group)
 {
-  /* create the expander for this group */
-  group->expander = gtk_expander_new (NULL);
-  gtk_expander_set_use_markup (GTK_EXPANDER (group->expander), TRUE);
-  /* TODO make this depend on the last remembered state: */
-  gtk_expander_set_expanded (GTK_EXPANDER (group->expander), TRUE);
-  gtk_container_set_border_width (GTK_CONTAINER (group->expander), 0);
-  gtk_expander_set_spacing (GTK_EXPANDER (group->expander), 0);
-  gtk_container_add (GTK_CONTAINER (group), group->expander);
-  gtk_widget_show (group->expander);
-
-  g_signal_connect_swapped (group->expander, "style-set",
+  g_signal_connect_swapped (group, "style-set",
                             G_CALLBACK (thunar_shortcut_group_expand_style_set),
                             group);
 
   /* add a box for the individual shortcuts */
   group->shortcuts = gtk_vbox_new (TRUE, 0);
-  gtk_container_add (GTK_CONTAINER (group->expander), group->shortcuts);
+  gtk_container_add (GTK_CONTAINER (group), group->shortcuts);
   gtk_widget_show (group->shortcuts);
 
   /* set the group up as a drop site to allow shortcuts to be re-ordered by DND */
@@ -179,9 +168,13 @@ thunar_shortcut_group_init (ThunarShortcutGroup *group)
 static void
 thunar_shortcut_group_constructed (GObject *object)
 {
-#if 0
   ThunarShortcutGroup *group = THUNAR_SHORTCUT_GROUP (object);
-#endif
+
+  gtk_expander_set_use_markup (GTK_EXPANDER (group), TRUE);
+  /* TODO make this depend on the last remembered state: */
+  gtk_expander_set_expanded (GTK_EXPANDER (group), TRUE);
+  gtk_container_set_border_width (GTK_CONTAINER (group), 0);
+  gtk_expander_set_spacing (GTK_EXPANDER (group), 0);
 }
 
 
@@ -224,7 +217,7 @@ thunar_shortcut_group_get_property (GObject    *object,
   switch (prop_id)
     {
     case PROP_LABEL:
-      label = gtk_expander_get_label (GTK_EXPANDER (group->expander));
+      label = gtk_expander_get_label (GTK_EXPANDER (group));
       g_value_set_string (value, label);
       break;
     case PROP_ACCCEPTED_TYPES:
@@ -254,7 +247,7 @@ thunar_shortcut_group_set_property (GObject      *object,
     case PROP_LABEL:
       label = g_value_get_string (value);
       label_markup = g_markup_printf_escaped (markup_format, label);
-      gtk_expander_set_label (GTK_EXPANDER (group->expander), label_markup);
+      gtk_expander_set_label (GTK_EXPANDER (group), label_markup);
       g_free (label_markup);
       break;
     case PROP_ACCCEPTED_TYPES:
@@ -295,7 +288,7 @@ thunar_shortcut_group_attract_attention (ThunarShortcutGroup *group)
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT_GROUP (group));
 
   /* check if we are in collapsed mode */
-  if (!gtk_expander_get_expanded (GTK_EXPANDER (group->expander)))
+  if (!gtk_expander_get_expanded (GTK_EXPANDER (group)))
     {
       /* abort active flash idle handlers */
       if (group->flash_idle_id > 0)
@@ -370,7 +363,7 @@ thunar_shortcut_group_expand_style_set (ThunarShortcutGroup *group,
 
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT_GROUP (group));
   _thunar_return_if_fail (GTK_IS_EXPANDER (expander));
-  _thunar_return_if_fail (expander == group->expander);
+  _thunar_return_if_fail (expander == GTK_WIDGET (group));
   
   children = gtk_container_get_children (GTK_CONTAINER (group->shortcuts));
 
@@ -394,7 +387,7 @@ thunar_shortcut_group_apply_indentation (ThunarShortcutGroup *group,
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
 
   /* get information about the expander arrow size */
-  gtk_widget_style_get (group->expander,
+  gtk_widget_style_get (GTK_WIDGET (group),
                         "expander-size", &expander_size,
                         "expander-spacing", &expander_spacing,
                         NULL);
