@@ -61,6 +61,11 @@ gboolean   thunar_shortcut_group_find_shortcut_by_file     (ThunarShortcutGroup 
 gboolean   thunar_shortcut_group_find_shortcut_by_location (ThunarShortcutGroup *group,
                                                             GFile               *location,
                                                             ThunarShortcut     **result);
+gboolean   thunar_shortcut_group_find_shortcut_by_coords   (ThunarShortcutGroup *group,
+                                                            gint                 x,
+                                                            gint                 y,
+                                                            ThunarShortcut     **shortcut,
+                                                            gint                *shortcut_index);
 
 G_END_DECLS
 

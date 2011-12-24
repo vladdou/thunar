@@ -1053,8 +1053,6 @@ thunar_shortcut_drag_motion (GtkWidget      *widget,
   /* abort if the target is unsupported */
   if (target != gdk_atom_intern_static_string ("text/uri-list"))
     {
-      g_debug ("shortcut drag motion: not a URI list");
-
       /* unsupported target, can't handle it, sorry */
       return FALSE;
     }

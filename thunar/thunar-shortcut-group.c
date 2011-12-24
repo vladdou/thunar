@@ -59,6 +59,9 @@ static void     thunar_shortcut_group_set_property      (GObject                
                                                          guint                   prop_id,
                                                          const GValue           *value,
                                                          GParamSpec             *pspec);
+static void     thunar_shortcut_group_drag_leave        (GtkWidget              *widget,
+                                                         GdkDragContext         *context,
+                                                         guint                   timestamp);
 static gboolean thunar_shortcut_group_drag_motion       (GtkWidget              *widget,
                                                          GdkDragContext         *context,
                                                          gint                    x,
@@ -86,6 +89,8 @@ struct _ThunarShortcutGroup
   ThunarShortcutType accepted_types;
 
   GtkWidget         *shortcuts;
+  GtkSizeGroup      *size_group;
+  GtkWidget         *empty_spot;
 
   guint              flash_idle_id;
   guint              flash_count;
@@ -121,6 +126,7 @@ thunar_shortcut_group_class_init (ThunarShortcutGroupClass *klass)
   gobject_class->set_property = thunar_shortcut_group_set_property;
 
   gtkwidget_class = GTK_WIDGET_CLASS (klass);
+  gtkwidget_class->drag_leave = thunar_shortcut_group_drag_leave;
   gtkwidget_class->drag_motion = thunar_shortcut_group_drag_motion;
 
   g_object_class_install_property (gobject_class,
@@ -170,11 +176,21 @@ thunar_shortcut_group_constructed (GObject *object)
 {
   ThunarShortcutGroup *group = THUNAR_SHORTCUT_GROUP (object);
 
+  /* configure the look and feel of the expander */
   gtk_expander_set_use_markup (GTK_EXPANDER (group), TRUE);
   /* TODO make this depend on the last remembered state: */
   gtk_expander_set_expanded (GTK_EXPANDER (group), TRUE);
   gtk_container_set_border_width (GTK_CONTAINER (group), 0);
   gtk_expander_set_spacing (GTK_EXPANDER (group), 0);
+
+  /* create a size group to enforce the same size for all shortcuts */
+  group->size_group = gtk_size_group_new (GTK_SIZE_GROUP_BOTH);
+
+  /* create an empty label to indicate an empty spot when re-ordering 
+   * shortcuts via DND */
+  group->empty_spot = gtk_frame_new (NULL);
+  gtk_frame_set_shadow_type (GTK_FRAME (group->empty_spot), GTK_SHADOW_IN);
+  g_object_ref (group->empty_spot);
 }
 
 
@@ -199,6 +215,12 @@ thunar_shortcut_group_finalize (GObject *object)
   /* abort flashing if still active */
   if (group->flash_idle_id > 0)
     g_source_remove (group->flash_idle_id);
+
+  /* release the empty spot label */
+  g_object_unref (group->empty_spot);
+
+  /* release the size group */
+  g_object_unref (group->size_group);
 
   (*G_OBJECT_CLASS (thunar_shortcut_group_parent_class)->finalize) (object);
 }
@@ -261,6 +283,27 @@ thunar_shortcut_group_set_property (GObject      *object,
 
 
 
+static void
+thunar_shortcut_group_drag_leave (GtkWidget      *widget,
+                                  GdkDragContext *context,
+                                  guint           timestamp)
+{
+  ThunarShortcutGroup *group = THUNAR_SHORTCUT_GROUP (widget);
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_GROUP (widget));
+  _thunar_return_if_fail (GDK_IS_DRAG_CONTEXT (context));
+
+  /* TODO immediately make the drag source visible again */
+
+  gtk_container_remove (GTK_CONTAINER (group->shortcuts), group->empty_spot);
+
+  /* call the parent's drag_leave() handler */
+  if (GTK_WIDGET_CLASS (thunar_shortcut_group_parent_class)->drag_leave != NULL)
+    (*GTK_WIDGET_CLASS (thunar_shortcut_group_parent_class)->drag_leave) (widget, context, timestamp);
+}
+
+
+
 static gboolean
 thunar_shortcut_group_drag_motion (GtkWidget      *widget,
                                    GdkDragContext *context,
@@ -268,16 +311,59 @@ thunar_shortcut_group_drag_motion (GtkWidget      *widget,
                                    gint            y,
                                    guint           timestamp)
 {
-#if 0
   ThunarShortcutGroup *group = THUNAR_SHORTCUT_GROUP (widget);
-#endif
+  ThunarShortcut      *shortcut;
+  GtkAllocation        allocation;
+  GdkAtom              target;
+  gint                 shortcut_index;
 
   _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT_GROUP (widget), FALSE);
   _thunar_return_val_if_fail (GDK_IS_DRAG_CONTEXT (context), FALSE);
 
-  g_debug ("shortcut group drag motion!");
+  /* call the parent's drag_motion() handler */
+  if (GTK_WIDGET_CLASS (thunar_shortcut_group_parent_class)->drag_motion != NULL)
+    (*GTK_WIDGET_CLASS (thunar_shortcut_group_parent_class)->drag_motion) (widget, context, x, y, timestamp);
 
-  return FALSE;
+  /* determine the drag target */
+  target = gtk_drag_dest_find_target (widget, context, NULL);
+
+  if (target == gdk_atom_intern_static_string ("THUNAR_DND_TARGET_SHORTCUT"))
+    {
+      gtk_widget_get_allocation (widget, &allocation);
+      y = y + allocation.y;
+
+      if (!thunar_shortcut_group_find_shortcut_by_coords (group, x, y,
+                                                          &shortcut,
+                                                          &shortcut_index))
+        {
+          gdk_drag_status (context, 0, timestamp);
+          return TRUE;
+        }
+
+      if (gtk_widget_get_parent (group->empty_spot) == NULL)
+        {
+          gtk_box_pack_start (GTK_BOX (group->shortcuts),
+                              group->empty_spot,
+                              FALSE, TRUE, 0);
+        }
+
+      gtk_box_reorder_child (GTK_BOX (group->shortcuts),
+                             group->empty_spot,
+                             shortcut_index);
+      gtk_widget_show (group->empty_spot);
+          
+      gdk_drag_status (context, 0, timestamp);
+      return TRUE;
+    }
+  else if (target == gdk_atom_intern_static_string ("text/uri-list"))
+    {
+      gdk_drag_status (context, 0, timestamp);
+      return TRUE;
+    }
+  else
+    {
+      return FALSE;
+    }
 }
 
 
@@ -438,6 +524,8 @@ thunar_shortcut_group_try_add_shortcut (ThunarShortcutGroup *group,
 
   gtk_box_pack_start (GTK_BOX (group->shortcuts), GTK_WIDGET (shortcut), FALSE, TRUE, 0);
   gtk_widget_show (GTK_WIDGET (shortcut));
+
+  gtk_size_group_add_widget (group->size_group, GTK_WIDGET (shortcut));
 
   /* notify the user that a new item was added to this group */
   thunar_shortcut_group_attract_attention (group);
@@ -668,4 +756,55 @@ thunar_shortcut_group_find_shortcut_by_location (ThunarShortcutGroup *group,
   g_list_free (children);
 
   return has_shortcut;
+}
+
+
+
+gboolean
+thunar_shortcut_group_find_shortcut_by_coords (ThunarShortcutGroup *group,
+                                               gint                 x,
+                                               gint                 y,
+                                               ThunarShortcut     **shortcut,
+                                               gint                *shortcut_index)
+{
+  GtkAllocation allocation = { 0, 0, 0, 0 };
+  gboolean      shortcut_found = FALSE;
+  GList        *children;
+  GList        *iter;
+  gint          idx = 0;
+
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT_GROUP (group), FALSE);
+
+  if (shortcut != NULL)
+    *shortcut = NULL;
+
+  if (shortcut_index != NULL)
+    *shortcut_index = -1;
+
+  children = gtk_container_get_children (GTK_CONTAINER (group->shortcuts));
+
+  for (iter = children; !shortcut_found && iter != NULL; iter = iter->next)
+    {
+      if (gtk_widget_get_visible (iter->data))
+        {
+          gtk_widget_get_allocation (iter->data, &allocation);
+
+          if (y >= allocation.y && y <= allocation.y + allocation.height)
+            {
+              if (shortcut != NULL)
+                *shortcut = iter->data;
+
+              if (shortcut_index != NULL)
+                *shortcut_index = idx;
+
+              shortcut_found = TRUE;
+            }
+        }
+
+      idx++;
+    }
+
+  g_list_free (children);
+
+  return shortcut_found;
 }
