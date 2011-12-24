@@ -314,6 +314,21 @@ typedef enum
 
 GType thunar_shortcut_type_get_type (void) G_GNUC_CONST;
 
+
+#define THUNAR_TYPE_DND_TARGET (thunar_dnd_target_get_type ())
+
+/**
+ * ThunarDNDTarget:
+ *
+ * Enum for thunar-internal drag-and-drop targets.
+ **/
+typedef enum
+{
+  THUNAR_DND_TARGET_SHORTCUT,
+} ThunarDNDTarget;
+
+GType thunar_dnd_target_get_type (void) G_GNUC_CONST;
+
 G_END_DECLS
 
 #endif /* !__THUNAR_ENUM_TYPES_H__ */

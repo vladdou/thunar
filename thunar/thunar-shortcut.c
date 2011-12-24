@@ -105,6 +105,8 @@ static gboolean      thunar_shortcut_button_press_event      (GtkWidget         
                                                               GdkEventButton     *event);
 static gboolean      thunar_shortcut_button_release_event    (GtkWidget          *widget,
                                                               GdkEventButton     *event);
+static void          thunar_shortcut_drag_begin              (GtkWidget          *widget,
+                                                              GdkDragContext     *context);
 static void          thunar_shortcut_drag_data_received      (GtkWidget          *widget,
                                                               GdkDragContext     *context,
                                                               gint                x,
@@ -117,6 +119,8 @@ static gboolean      thunar_shortcut_drag_drop               (GtkWidget         
                                                               gint                x,
                                                               gint                y,
                                                               guint               timestamp);
+static void          thunar_shortcut_drag_end                (GtkWidget          *widget,
+                                                              GdkDragContext     *context);
 static void          thunar_shortcut_drag_leave              (GtkWidget          *widget,
                                                               GdkDragContext     *context,
                                                               guint               timestamp);
@@ -253,9 +257,14 @@ G_DEFINE_TYPE_WITH_CODE (ThunarShortcut, thunar_shortcut, GTK_TYPE_EVENT_BOX,
 
 static guint shortcut_signals[LAST_SIGNAL];
 
+static const GtkTargetEntry drag_targets[] =
+{
+  { "THUNAR_DND_TARGET_SHORTCUT", GTK_TARGET_SAME_APP, THUNAR_DND_TARGET_SHORTCUT }
+};
+
 static const GtkTargetEntry drop_targets[] =
 {
-  { "text/uri-list", 0, TARGET_TEXT_URI_LIST }
+  { "text/uri-list", 0, TARGET_TEXT_URI_LIST },
 };
 
 
@@ -278,8 +287,10 @@ thunar_shortcut_class_init (ThunarShortcutClass *klass)
   gtkwidget_class = GTK_WIDGET_CLASS (klass);
   gtkwidget_class->button_press_event = thunar_shortcut_button_press_event;
   gtkwidget_class->button_release_event = thunar_shortcut_button_release_event;
+  gtkwidget_class->drag_begin = thunar_shortcut_drag_begin;
   gtkwidget_class->drag_data_received = thunar_shortcut_drag_data_received;
   gtkwidget_class->drag_drop = thunar_shortcut_drag_drop;
+  gtkwidget_class->drag_end = thunar_shortcut_drag_end;
   gtkwidget_class->drag_leave = thunar_shortcut_drag_leave;
   gtkwidget_class->drag_motion = thunar_shortcut_drag_motion;
   gtkwidget_class->key_press_event = thunar_shortcut_key_press_event;
@@ -532,6 +543,14 @@ thunar_shortcut_constructed (GObject *object)
 
   /* mark as constructed so now all properties can be changed as usual */
   shortcut->constructed = TRUE;
+
+  if (shortcut->mutable)
+    {
+      /* set up drag support for re-ordering shortcuts */
+      gtk_drag_source_set (GTK_WIDGET (shortcut), GDK_BUTTON1_MASK,
+                           drag_targets, G_N_ELEMENTS (drag_targets),
+                           GDK_ACTION_MOVE);
+    }
 }
 
 
@@ -810,6 +829,35 @@ thunar_shortcut_button_release_event (GtkWidget      *widget,
 
 
 static void
+thunar_shortcut_drag_begin (GtkWidget      *widget,
+                            GdkDragContext *context)
+{
+  ThunarShortcut *shortcut = THUNAR_SHORTCUT (widget);
+  GdkPixmap      *pixmap;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT (widget));
+  _thunar_return_if_fail (GDK_IS_DRAG_CONTEXT (context));
+
+  /* reset the pressed button state */
+  shortcut->pressed_button = -1;
+
+  /* take a snapshot of the shortcut and use it as the drag icon */
+  pixmap = gtk_widget_get_snapshot (widget, NULL);
+  gtk_drag_set_icon_pixmap (context, gtk_widget_get_colormap (widget),
+                            pixmap, NULL, 0, 0);
+  g_object_unref (pixmap);
+
+  /* hide the shortcut as we are now dragging it */
+  gtk_widget_hide (widget);
+
+  /* call the parent's drag_begin() handler */
+  if (GTK_WIDGET_CLASS (thunar_shortcut_parent_class)->drag_begin != NULL)
+    (*GTK_WIDGET_CLASS (thunar_shortcut_parent_class)->drag_begin) (widget, context);
+}
+
+
+
+static void
 thunar_shortcut_drag_data_received (GtkWidget        *widget,
                                     GdkDragContext   *context,
                                     gint              x,
@@ -933,6 +981,28 @@ thunar_shortcut_drag_drop (GtkWidget      *widget,
 
 
 static void
+thunar_shortcut_drag_end (GtkWidget      *widget,
+                          GdkDragContext *context)
+{
+  ThunarShortcut *shortcut = THUNAR_SHORTCUT (widget);
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT (widget));
+  _thunar_return_if_fail (GDK_IS_DRAG_CONTEXT (context));
+
+  /* reset the pressed button state */
+  shortcut->pressed_button = -1;
+
+  /* show the shortcut again as we are finished dragging it */
+  gtk_widget_show (widget);
+
+  /* call the parent's drag_begin() handler */
+  if (GTK_WIDGET_CLASS (thunar_shortcut_parent_class)->drag_end != NULL)
+    (*GTK_WIDGET_CLASS (thunar_shortcut_parent_class)->drag_end) (widget, context);
+}
+
+
+
+static void
 thunar_shortcut_drag_leave (GtkWidget      *widget,
                             GdkDragContext *context,
                             guint           timestamp)
@@ -983,6 +1053,8 @@ thunar_shortcut_drag_motion (GtkWidget      *widget,
   /* abort if the target is unsupported */
   if (target != gdk_atom_intern_static_string ("text/uri-list"))
     {
+      g_debug ("shortcut drag motion: not a URI list");
+
       /* unsupported target, can't handle it, sorry */
       return FALSE;
     }

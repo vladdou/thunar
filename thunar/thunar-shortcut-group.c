@@ -59,6 +59,11 @@ static void     thunar_shortcut_group_set_property      (GObject                
                                                          guint                   prop_id,
                                                          const GValue           *value,
                                                          GParamSpec             *pspec);
+static gboolean thunar_shortcut_group_drag_motion       (GtkWidget              *widget,
+                                                         GdkDragContext         *context,
+                                                         gint                    x,
+                                                         gint                    y,
+                                                         guint                   timestamp);
 static void     thunar_shortcut_group_attract_attention (ThunarShortcutGroup    *group);
 static gboolean thunar_shortcut_group_flash_expander    (gpointer                user_data);
 static void     thunar_shortcut_group_expand_style_set  (ThunarShortcutGroup    *group,
@@ -93,10 +98,18 @@ G_DEFINE_TYPE (ThunarShortcutGroup, thunar_shortcut_group, GTK_TYPE_EVENT_BOX)
 
 
 
+static const GtkTargetEntry drop_targets[] =
+{
+  { "THUNAR_DND_TARGET_SHORTCUT", GTK_TARGET_SAME_APP, THUNAR_DND_TARGET_SHORTCUT },
+};
+
+
+
 static void
 thunar_shortcut_group_class_init (ThunarShortcutGroupClass *klass)
 {
-  GObjectClass *gobject_class;
+  GtkWidgetClass *gtkwidget_class;
+  GObjectClass   *gobject_class;
 
   /* Determine the parent type class */
   thunar_shortcut_group_parent_class = g_type_class_peek_parent (klass);
@@ -107,6 +120,9 @@ thunar_shortcut_group_class_init (ThunarShortcutGroupClass *klass)
   gobject_class->finalize = thunar_shortcut_group_finalize; 
   gobject_class->get_property = thunar_shortcut_group_get_property;
   gobject_class->set_property = thunar_shortcut_group_set_property;
+
+  gtkwidget_class = GTK_WIDGET_CLASS (klass);
+  gtkwidget_class->drag_motion = thunar_shortcut_group_drag_motion;
 
   g_object_class_install_property (gobject_class,
                                    PROP_LABEL,
@@ -151,6 +167,11 @@ thunar_shortcut_group_init (ThunarShortcutGroup *group)
   group->shortcuts = gtk_vbox_new (TRUE, 0);
   gtk_container_add (GTK_CONTAINER (group->expander), group->shortcuts);
   gtk_widget_show (group->shortcuts);
+
+  /* set the group up as a drop site to allow shortcuts to be re-ordered by DND */
+  gtk_drag_dest_set (GTK_WIDGET (group), 0,
+                     drop_targets, G_N_ELEMENTS (drop_targets),
+                     GDK_ACTION_MOVE);
 }
 
 
@@ -243,6 +264,27 @@ thunar_shortcut_group_set_property (GObject      *object,
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
     }
+}
+
+
+
+static gboolean
+thunar_shortcut_group_drag_motion (GtkWidget      *widget,
+                                   GdkDragContext *context,
+                                   gint            x,
+                                   gint            y,
+                                   guint           timestamp)
+{
+#if 0
+  ThunarShortcutGroup *group = THUNAR_SHORTCUT_GROUP (widget);
+#endif
+
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT_GROUP (widget), FALSE);
+  _thunar_return_val_if_fail (GDK_IS_DRAG_CONTEXT (context), FALSE);
+
+  g_debug ("shortcut group drag motion!");
+
+  return FALSE;
 }
 
 
