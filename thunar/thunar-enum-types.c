@@ -371,8 +371,9 @@ thunar_dnd_target_get_type (void)
     {
       static const GEnumValue values[] =
       {
-        { THUNAR_DND_TARGET_SHORTCUT, "THUNAR_DND_TARGET_SHORTCUT", "shortcut", },
-        { 0,                          NULL,                         NULL,       },
+        { THUNAR_DND_TARGET_SHORTCUT,      "THUNAR_DND_TARGET_SHORTCUT",      "shortcut",     },
+        { THUNAR_DND_TARGET_TEXT_URI_LIST, "THUNAR_DND_TARGET_TEXT_URI_LIST", "text/uri-list" },
+        { 0,                               NULL,                              NULL,           },
       };
 
       type = g_enum_register_static (I_("ThunarDNDTarget"), values);

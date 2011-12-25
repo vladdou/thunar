@@ -75,12 +75,6 @@ enum
   LAST_SIGNAL,
 };
 
-/* identifiers for DnD target types */
-enum
-{
-  TARGET_TEXT_URI_LIST,
-};
-
 /* row states */
 typedef enum
 {
@@ -245,6 +239,8 @@ struct _ThunarShortcut
   guint               drop_data_ready : 1;
   GList              *drop_file_list;
 
+  GdkPixmap          *pre_drag_snapshot;
+
   gint                pressed_button;
 };
 
@@ -264,7 +260,7 @@ static const GtkTargetEntry drag_targets[] =
 
 static const GtkTargetEntry drop_targets[] =
 {
-  { "text/uri-list", 0, TARGET_TEXT_URI_LIST },
+  { "text/uri-list", 0, THUNAR_DND_TARGET_TEXT_URI_LIST },
 };
 
 
@@ -560,6 +556,10 @@ thunar_shortcut_finalize (GObject *object)
 {
   ThunarShortcut *shortcut = THUNAR_SHORTCUT (object);
 
+  /* release the pre-drag snapshot */
+  if (shortcut->pre_drag_snapshot != NULL)
+    g_object_unref (shortcut->pre_drag_snapshot);
+
   /* release the spinner and action image */
   g_object_unref (shortcut->spinner);
   g_object_unref (shortcut->action_image);
@@ -833,7 +833,6 @@ thunar_shortcut_drag_begin (GtkWidget      *widget,
                             GdkDragContext *context)
 {
   ThunarShortcut *shortcut = THUNAR_SHORTCUT (widget);
-  GdkPixmap      *pixmap;
 
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT (widget));
   _thunar_return_if_fail (GDK_IS_DRAG_CONTEXT (context));
@@ -841,14 +840,13 @@ thunar_shortcut_drag_begin (GtkWidget      *widget,
   /* reset the pressed button state */
   shortcut->pressed_button = -1;
 
-  /* take a snapshot of the shortcut and use it as the drag icon */
-  pixmap = gtk_widget_get_snapshot (widget, NULL);
-  gtk_drag_set_icon_pixmap (context, gtk_widget_get_colormap (widget),
-                            pixmap, NULL, 0, 0);
-  g_object_unref (pixmap);
-
-  /* hide the shortcut as we are now dragging it */
-  gtk_widget_hide (widget);
+  /* take a snapshot of the shortcut */
+  if (shortcut->pre_drag_snapshot != NULL)
+    {
+      g_object_unref (shortcut->pre_drag_snapshot);
+      shortcut->pre_drag_snapshot = NULL;
+    }
+  shortcut->pre_drag_snapshot = gtk_widget_get_snapshot (widget, NULL);
 
   /* call the parent's drag_begin() handler */
   if (GTK_WIDGET_CLASS (thunar_shortcut_parent_class)->drag_begin != NULL)
@@ -878,7 +876,7 @@ thunar_shortcut_drag_data_received (GtkWidget        *widget,
   if (!shortcut->drop_data_ready)
     {
       /* extract the URI list from the selection data (if valid) */
-      if (info == TARGET_TEXT_URI_LIST
+      if (info == THUNAR_DND_TARGET_TEXT_URI_LIST
           && selection_data->format == 8
           && selection_data->length > 0)
         {
@@ -897,7 +895,7 @@ thunar_shortcut_drag_data_received (GtkWidget        *widget,
       shortcut->drop_occurred = FALSE;
 
       /* make sure we only handle text/uri-list */
-      if (info == TARGET_TEXT_URI_LIST)
+      if (info == THUNAR_DND_TARGET_TEXT_URI_LIST)
         {
           if (shortcut->file != NULL)
             {
@@ -2844,4 +2842,13 @@ thunar_shortcut_matches_location (ThunarShortcut *shortcut,
     }
 
   return matches;
+}
+
+
+
+GdkPixmap *
+thunar_shortcut_get_pre_drag_snapshot (ThunarShortcut *shortcut)
+{
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT (shortcut), NULL);
+  return shortcut->pre_drag_snapshot;
 }

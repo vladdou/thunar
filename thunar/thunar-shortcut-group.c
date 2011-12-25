@@ -48,32 +48,49 @@ enum
 
 
 
-static void     thunar_shortcut_group_constructed       (GObject                *object);
-static void     thunar_shortcut_group_dispose           (GObject                *object);
-static void     thunar_shortcut_group_finalize          (GObject                *object);
-static void     thunar_shortcut_group_get_property      (GObject                *object,
-                                                         guint                   prop_id,
-                                                         GValue                 *value,
-                                                         GParamSpec             *pspec);
-static void     thunar_shortcut_group_set_property      (GObject                *object,
-                                                         guint                   prop_id,
-                                                         const GValue           *value,
-                                                         GParamSpec             *pspec);
-static void     thunar_shortcut_group_drag_leave        (GtkWidget              *widget,
-                                                         GdkDragContext         *context,
-                                                         guint                   timestamp);
-static gboolean thunar_shortcut_group_drag_motion       (GtkWidget              *widget,
-                                                         GdkDragContext         *context,
-                                                         gint                    x,
-                                                         gint                    y,
-                                                         guint                   timestamp);
-static void     thunar_shortcut_group_attract_attention (ThunarShortcutGroup    *group);
-static gboolean thunar_shortcut_group_flash_expander    (gpointer                user_data);
-static void     thunar_shortcut_group_expand_style_set  (ThunarShortcutGroup    *group,
-                                                         GtkStyle               *style,
-                                                         GtkWidget              *expander);
-static void     thunar_shortcut_group_apply_indentation (ThunarShortcutGroup    *group,
-                                                         ThunarShortcut         *shortcut);
+static void     thunar_shortcut_group_constructed          (GObject                *object);
+static void     thunar_shortcut_group_dispose              (GObject                *object);
+static void     thunar_shortcut_group_finalize             (GObject                *object);
+static void     thunar_shortcut_group_get_property         (GObject                *object,
+                                                            guint                   prop_id,
+                                                            GValue                 *value,
+                                                            GParamSpec             *pspec);
+static void     thunar_shortcut_group_set_property         (GObject                *object,
+                                                            guint                   prop_id,
+                                                            const GValue           *value,
+                                                            GParamSpec             *pspec);
+static void     thunar_shortcut_group_drag_data_received   (GtkWidget              *widget,
+                                                            GdkDragContext         *context,
+                                                            gint                    x,
+                                                            gint                    y,
+                                                            GtkSelectionData       *data,
+                                                            guint                   info,
+                                                            guint                   timestamp);
+static gboolean thunar_shortcut_group_drag_drop            (GtkWidget              *widget,
+                                                            GdkDragContext         *context,
+                                                            gint                    x,
+                                                            gint                    y,
+                                                            guint                   timestamp);
+static void     thunar_shortcut_group_drag_leave           (GtkWidget              *widget,
+                                                            GdkDragContext         *context,
+                                                            guint                   timestamp);
+static gboolean thunar_shortcut_group_drag_motion          (GtkWidget              *widget,
+                                                            GdkDragContext         *context,
+                                                            gint                    x,
+                                                            gint                    y,
+                                                            guint                   timestamp);
+static void     thunar_shortcut_group_attract_attention    (ThunarShortcutGroup    *group);
+static gboolean thunar_shortcut_group_flash_expander       (gpointer                user_data);
+static void     thunar_shortcut_group_expand_style_set     (ThunarShortcutGroup    *group,
+                                                            GtkStyle               *style,
+                                                            GtkWidget              *expander);
+static void     thunar_shortcut_group_apply_indentation    (ThunarShortcutGroup    *group,
+                                                            ThunarShortcut         *shortcut);
+static gboolean thunar_shortcut_group_find_child_by_coords (ThunarShortcutGroup    *group,
+                                                            gint                    x,
+                                                            gint                    y,
+                                                            GtkWidget             **child,
+                                                            gint                   *child_index);
 
 
 
@@ -94,6 +111,10 @@ struct _ThunarShortcutGroup
 
   guint              flash_idle_id;
   guint              flash_count;
+
+  guint              drop_data_ready : 1;
+  guint              drop_occurred : 1;
+  ThunarShortcut    *drop_shortcut;
 };
 
 
@@ -104,6 +125,7 @@ G_DEFINE_TYPE (ThunarShortcutGroup, thunar_shortcut_group, GTK_TYPE_EXPANDER)
 
 static const GtkTargetEntry drop_targets[] =
 {
+  { "text/uri-list", 0, THUNAR_DND_TARGET_TEXT_URI_LIST },
   { "THUNAR_DND_TARGET_SHORTCUT", GTK_TARGET_SAME_APP, THUNAR_DND_TARGET_SHORTCUT },
 };
 
@@ -126,6 +148,8 @@ thunar_shortcut_group_class_init (ThunarShortcutGroupClass *klass)
   gobject_class->set_property = thunar_shortcut_group_set_property;
 
   gtkwidget_class = GTK_WIDGET_CLASS (klass);
+  gtkwidget_class->drag_data_received = thunar_shortcut_group_drag_data_received;
+  gtkwidget_class->drag_drop = thunar_shortcut_group_drag_drop;
   gtkwidget_class->drag_leave = thunar_shortcut_group_drag_leave;
   gtkwidget_class->drag_motion = thunar_shortcut_group_drag_motion;
 
@@ -188,8 +212,7 @@ thunar_shortcut_group_constructed (GObject *object)
 
   /* create an empty label to indicate an empty spot when re-ordering 
    * shortcuts via DND */
-  group->empty_spot = gtk_frame_new (NULL);
-  gtk_frame_set_shadow_type (GTK_FRAME (group->empty_spot), GTK_SHADOW_IN);
+  group->empty_spot = gtk_image_new ();
   g_object_ref (group->empty_spot);
 }
 
@@ -284,6 +307,99 @@ thunar_shortcut_group_set_property (GObject      *object,
 
 
 static void
+thunar_shortcut_group_drag_data_received (GtkWidget        *widget,
+                                          GdkDragContext   *context,
+                                          gint              x,
+                                          gint              y,
+                                          GtkSelectionData *data,
+                                          guint             info,
+                                          guint             timestamp)
+{
+  ThunarShortcutGroup *group = THUNAR_SHORTCUT_GROUP (widget);
+  GtkWidget           *shortcut;
+  GList               *children;
+  GList               *iter;
+  gint                 empty_spot_index;
+
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT_GROUP (widget));
+  _thunar_return_if_fail (GDK_IS_DRAG_CONTEXT (context));
+
+  if (info == THUNAR_DND_TARGET_SHORTCUT)
+    {
+      /* only read data if we don't have it yet */
+      if (!group->drop_data_ready)
+        {
+          group->drop_shortcut = THUNAR_SHORTCUT (gtk_drag_get_source_widget (context));
+          group->drop_data_ready = TRUE;
+        }
+
+      if (group->drop_occurred)
+        {
+          group->drop_occurred = FALSE;
+
+          children = gtk_container_get_children (GTK_CONTAINER (group->shortcuts));
+          iter = g_list_find (children, group->empty_spot);
+          empty_spot_index = g_list_position (children, iter);
+          g_list_free (children);
+
+          shortcut = gtk_drag_get_source_widget (context);
+          gtk_box_reorder_child (GTK_BOX (group->shortcuts), shortcut, empty_spot_index);
+
+          thunar_shortcut_group_drag_leave (widget, context, timestamp);
+
+          gtk_drag_finish (context, TRUE, FALSE, timestamp);
+        }
+    }
+  else if (info == THUNAR_DND_TARGET_TEXT_URI_LIST)
+    {
+      /* only read data if we don't have it yet */
+      if (!group->drop_data_ready)
+        {
+        }
+
+      if (group->drop_occurred)
+        {
+          group->drop_occurred = FALSE;
+        }
+    }
+}
+
+
+
+static gboolean
+thunar_shortcut_group_drag_drop (GtkWidget      *widget,
+                                 GdkDragContext *context,
+                                 gint            x,
+                                 gint            y,
+                                 guint           timestamp)
+{
+  ThunarShortcutGroup *group = THUNAR_SHORTCUT_GROUP (widget);
+  GdkAtom              target;
+
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT_GROUP (widget), FALSE);
+  _thunar_return_val_if_fail (GDK_IS_DRAG_CONTEXT (context), FALSE);
+
+  target = gtk_drag_dest_find_target (widget, context, NULL);
+  if (target == gdk_atom_intern_static_string ("THUNAR_DND_TARGET_SHORTCUT"))
+    {
+      /* set the state so that drag_data_received knows that it needs to drop now */
+      group->drop_occurred = TRUE;
+
+      /* request the drag data from the source and perform the drop */
+      gtk_drag_get_data (widget, context, target, timestamp);
+
+      return TRUE;
+    }
+  else
+    {
+      /* we cannot handle the drop */
+      return FALSE;
+    }
+}
+
+
+
+static void
 thunar_shortcut_group_drag_leave (GtkWidget      *widget,
                                   GdkDragContext *context,
                                   guint           timestamp)
@@ -293,9 +409,16 @@ thunar_shortcut_group_drag_leave (GtkWidget      *widget,
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT_GROUP (widget));
   _thunar_return_if_fail (GDK_IS_DRAG_CONTEXT (context));
 
-  /* TODO immediately make the drag source visible again */
+  /* reset DND state information */
+  if (group->drop_data_ready)
+    {
+      group->drop_data_ready = FALSE;
+      group->drop_occurred = FALSE;
+      group->drop_shortcut = NULL;
+    }
 
-  gtk_container_remove (GTK_CONTAINER (group->shortcuts), group->empty_spot);
+  /* hide the empty spot indicator */
+  gtk_widget_hide (group->empty_spot);
 
   /* call the parent's drag_leave() handler */
   if (GTK_WIDGET_CLASS (thunar_shortcut_group_parent_class)->drag_leave != NULL)
@@ -312,10 +435,12 @@ thunar_shortcut_group_drag_motion (GtkWidget      *widget,
                                    guint           timestamp)
 {
   ThunarShortcutGroup *group = THUNAR_SHORTCUT_GROUP (widget);
-  ThunarShortcut      *shortcut;
   GtkAllocation        allocation;
+  GdkDragAction        actions = 0;
+  GdkPixmap           *pixmap;
+  GtkWidget           *child = NULL;
   GdkAtom              target;
-  gint                 shortcut_index;
+  gint                 child_index;
 
   _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT_GROUP (widget), FALSE);
   _thunar_return_val_if_fail (GDK_IS_DRAG_CONTEXT (context), FALSE);
@@ -329,41 +454,95 @@ thunar_shortcut_group_drag_motion (GtkWidget      *widget,
 
   if (target == gdk_atom_intern_static_string ("THUNAR_DND_TARGET_SHORTCUT"))
     {
-      gtk_widget_get_allocation (widget, &allocation);
-      y = y + allocation.y;
-
-      if (!thunar_shortcut_group_find_shortcut_by_coords (group, x, y,
-                                                          &shortcut,
-                                                          &shortcut_index))
+      /* request the drop data on demand */
+      if (!group->drop_data_ready)
         {
-          gdk_drag_status (context, 0, timestamp);
+          /* request the drop data from the source */
+          gtk_drag_get_data (widget, context, target, timestamp);
+          if (!gtk_widget_is_ancestor (GTK_WIDGET (group->drop_shortcut), widget))
+            return FALSE;
           return TRUE;
         }
-
-      if (gtk_widget_get_parent (group->empty_spot) == NULL)
+      else
         {
-          gtk_box_pack_start (GTK_BOX (group->shortcuts),
-                              group->empty_spot,
-                              FALSE, TRUE, 0);
-        }
+          if (!gtk_widget_is_ancestor (GTK_WIDGET (group->drop_shortcut), widget))
+            return FALSE;
 
-      gtk_box_reorder_child (GTK_BOX (group->shortcuts),
-                             group->empty_spot,
-                             shortcut_index);
-      gtk_widget_show (group->empty_spot);
-          
-      gdk_drag_status (context, 0, timestamp);
-      return TRUE;
+          /* translate the y coordinate so that it is relative to the parent */
+          gtk_widget_get_allocation (widget, &allocation);
+          y = y + allocation.y;
+
+          /* find the shortcut we are currently hovering */
+          if (!thunar_shortcut_group_find_child_by_coords (group, x, y,
+                                                           &child,
+                                                           &child_index))
+            {
+              gdk_drag_status (context, 0, timestamp);
+              return TRUE;
+            }
+
+          /* if the hovered shortcut is mutable, show an empty spot indicator */
+          if (THUNAR_IS_SHORTCUT (child))
+            {
+              if (thunar_shortcut_get_mutable (THUNAR_SHORTCUT (child)))
+                {
+                  /* add the empty spot indicator to the shortcuts container */
+                  if (gtk_widget_get_parent (group->empty_spot) == NULL)
+                    {
+                      gtk_box_pack_start (GTK_BOX (group->shortcuts),
+                                          group->empty_spot,
+                                          FALSE, TRUE, 0);
+                    }
+
+                  /* show the empty spot indicator before/after the hovered shortcut,
+                   * depending on where exactly the drag motion happened */
+                  gtk_widget_get_allocation (child, &allocation);
+                  if (y > allocation.y + allocation.height / 2)
+                    child_index += 1;
+                  gtk_box_reorder_child (GTK_BOX (group->shortcuts),
+                                         group->empty_spot,
+                                         child_index);
+
+                  /* display a snapshot of the dragged shortcut in the empty spot */
+                  pixmap = thunar_shortcut_get_pre_drag_snapshot (group->drop_shortcut);
+                  gtk_image_set_from_pixmap (GTK_IMAGE (group->empty_spot),
+                                             pixmap,
+                                             NULL);
+
+                  /* hide the dragged shortcut as we are now dragging it */
+                  gtk_widget_hide (GTK_WIDGET (group->drop_shortcut));
+
+                  /* make sure to show the empty spot indicator */
+                  gtk_widget_show (group->empty_spot);
+                }
+            }
+
+          /* allow reordering */
+          actions = GDK_ACTION_MOVE;
+        }
     }
   else if (target == gdk_atom_intern_static_string ("text/uri-list"))
     {
-      gdk_drag_status (context, 0, timestamp);
-      return TRUE;
+      /* request the drop data on demand */
+      if (!group->drop_data_ready)
+        {
+          /* request the drop data from the source */
+          gtk_drag_get_data (widget, context, target, timestamp);
+        }
+      else
+        {
+        }
     }
   else
     {
+      /* unsupported target */
       return FALSE;
     }
+
+  /* tell Gdk whether we can drop here */
+  gdk_drag_status (context, actions, timestamp);
+
+  return TRUE;
 }
 
 
@@ -454,7 +633,10 @@ thunar_shortcut_group_expand_style_set (ThunarShortcutGroup *group,
   children = gtk_container_get_children (GTK_CONTAINER (group->shortcuts));
 
   for (iter = children; iter != NULL; iter = iter->next)
-    thunar_shortcut_group_apply_indentation (group, THUNAR_SHORTCUT (iter->data));
+    {
+      if (THUNAR_IS_SHORTCUT (iter->data))
+        thunar_shortcut_group_apply_indentation (group, THUNAR_SHORTCUT (iter->data));
+    }
 
   g_list_free (children);
 }
@@ -483,6 +665,57 @@ thunar_shortcut_group_apply_indentation (ThunarShortcutGroup *group,
   g_object_set (alignment,
                 "left-padding", expander_size + expander_spacing * 2 + 2,
                 NULL);
+}
+
+
+
+static gboolean
+thunar_shortcut_group_find_child_by_coords (ThunarShortcutGroup *group,
+                                            gint                 x,
+                                            gint                 y,
+                                            GtkWidget          **child,
+                                            gint                *child_index)
+{
+  GtkAllocation allocation = { 0, 0, 0, 0 };
+  gboolean      child_found = FALSE;
+  GList        *children;
+  GList        *iter;
+  gint          idx = 0;
+
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT_GROUP (group), FALSE);
+
+  if (child != NULL)
+    *child = NULL;
+
+  if (child_index != NULL)
+    *child_index = -1;
+
+  children = gtk_container_get_children (GTK_CONTAINER (group->shortcuts));
+
+  for (iter = children; !child_found && iter != NULL; iter = iter->next)
+    {
+      if (gtk_widget_get_visible (iter->data))
+        {
+          gtk_widget_get_allocation (iter->data, &allocation);
+
+          if (y >= allocation.y && y <= allocation.y + allocation.height)
+            {
+              if (child != NULL)
+                *child = iter->data;
+
+              if (child_index != NULL)
+                *child_index = idx;
+
+              child_found = TRUE;
+            }
+        }
+
+      idx++;
+    }
+
+  g_list_free (children);
+
+  return child_found;
 }
 
 
@@ -550,6 +783,9 @@ thunar_shortcut_group_unselect_shortcuts (ThunarShortcutGroup *group,
 
   for (iter = children; iter != NULL; iter = iter->next)
     {
+      if (!THUNAR_IS_SHORTCUT (iter->data))
+        continue;
+
       shortcut = THUNAR_SHORTCUT (iter->data);
 
       if (shortcut != exception
@@ -557,6 +793,7 @@ thunar_shortcut_group_unselect_shortcuts (ThunarShortcutGroup *group,
         {
           gtk_widget_set_state (GTK_WIDGET (shortcut), GTK_STATE_NORMAL);
         }
+      
     }
 
   g_list_free (children);
@@ -579,6 +816,9 @@ thunar_shortcut_group_unprelight_shortcuts (ThunarShortcutGroup *group,
 
   for (iter = children; iter != NULL; iter = iter->next)
     {
+      if (!THUNAR_IS_SHORTCUT (iter->data))
+        continue;
+
       shortcut = THUNAR_SHORTCUT (iter->data);
 
       if (shortcut != exception
@@ -608,6 +848,9 @@ thunar_shortcut_group_cancel_activations (ThunarShortcutGroup *group,
 
   for (iter = children; iter != NULL; iter = iter->next)
     {
+      if (!THUNAR_IS_SHORTCUT (iter->data))
+        continue;
+
       shortcut = THUNAR_SHORTCUT (iter->data);
 
       if (shortcut != exception)
@@ -634,6 +877,9 @@ thunar_shortcut_group_update_selection (ThunarShortcutGroup *group,
 
   for (iter = children; iter != NULL; iter = iter->next)
     {
+      if (!THUNAR_IS_SHORTCUT (iter->data))
+        continue;
+
       shortcut = THUNAR_SHORTCUT (iter->data);
 
       if (thunar_shortcut_matches_file (shortcut, file))
@@ -663,6 +909,9 @@ thunar_shortcut_group_remove_volume_shortcut (ThunarShortcutGroup *group,
 
   for (iter = children; iter != NULL; iter = iter->next)
     {
+      if (!THUNAR_IS_SHORTCUT (iter->data))
+        continue;
+
       shortcut = THUNAR_SHORTCUT (iter->data);
       shortcut_volume = thunar_shortcut_get_volume (shortcut);
 
@@ -692,6 +941,9 @@ thunar_shortcut_group_remove_mount_shortcut (ThunarShortcutGroup *group,
 
   for (iter = children; iter != NULL; iter = iter->next)
     {
+      if (!THUNAR_IS_SHORTCUT (iter->data))
+        continue;
+
       shortcut = THUNAR_SHORTCUT (iter->data);
 
       if (!thunar_shortcut_get_persistent (shortcut))
@@ -742,6 +994,9 @@ thunar_shortcut_group_find_shortcut_by_location (ThunarShortcutGroup *group,
 
   for (iter = children; !has_shortcut && iter != NULL; iter = iter->next)
     {
+      if (!THUNAR_IS_SHORTCUT (iter->data))
+        continue;
+
       shortcut = THUNAR_SHORTCUT (iter->data);
 
       if (thunar_shortcut_matches_location (shortcut, location))
@@ -756,55 +1011,4 @@ thunar_shortcut_group_find_shortcut_by_location (ThunarShortcutGroup *group,
   g_list_free (children);
 
   return has_shortcut;
-}
-
-
-
-gboolean
-thunar_shortcut_group_find_shortcut_by_coords (ThunarShortcutGroup *group,
-                                               gint                 x,
-                                               gint                 y,
-                                               ThunarShortcut     **shortcut,
-                                               gint                *shortcut_index)
-{
-  GtkAllocation allocation = { 0, 0, 0, 0 };
-  gboolean      shortcut_found = FALSE;
-  GList        *children;
-  GList        *iter;
-  gint          idx = 0;
-
-  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT_GROUP (group), FALSE);
-
-  if (shortcut != NULL)
-    *shortcut = NULL;
-
-  if (shortcut_index != NULL)
-    *shortcut_index = -1;
-
-  children = gtk_container_get_children (GTK_CONTAINER (group->shortcuts));
-
-  for (iter = children; !shortcut_found && iter != NULL; iter = iter->next)
-    {
-      if (gtk_widget_get_visible (iter->data))
-        {
-          gtk_widget_get_allocation (iter->data, &allocation);
-
-          if (y >= allocation.y && y <= allocation.y + allocation.height)
-            {
-              if (shortcut != NULL)
-                *shortcut = iter->data;
-
-              if (shortcut_index != NULL)
-                *shortcut_index = idx;
-
-              shortcut_found = TRUE;
-            }
-        }
-
-      idx++;
-    }
-
-  g_list_free (children);
-
-  return shortcut_found;
 }

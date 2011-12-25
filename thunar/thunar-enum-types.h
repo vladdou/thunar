@@ -325,6 +325,7 @@ GType thunar_shortcut_type_get_type (void) G_GNUC_CONST;
 typedef enum
 {
   THUNAR_DND_TARGET_SHORTCUT,
+  THUNAR_DND_TARGET_TEXT_URI_LIST,
 } ThunarDNDTarget;
 
 GType thunar_dnd_target_get_type (void) G_GNUC_CONST;
