@@ -92,7 +92,7 @@ gboolean           thunar_shortcut_matches_file          (ThunarShortcut    *sho
                                                           ThunarFile        *file);
 gboolean           thunar_shortcut_matches_location      (ThunarShortcut    *shortcut,
                                                           GFile             *location);
-GdkPixmap         *thunar_shortcut_get_pre_drag_snapshot (ThunarShortcut    *shortcut);
+const gchar       *thunar_shortcut_get_display_name      (ThunarShortcut    *shortcut);
 
 G_END_DECLS
 

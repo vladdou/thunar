@@ -99,8 +99,6 @@ static gboolean      thunar_shortcut_button_press_event      (GtkWidget         
                                                               GdkEventButton     *event);
 static gboolean      thunar_shortcut_button_release_event    (GtkWidget          *widget,
                                                               GdkEventButton     *event);
-static void          thunar_shortcut_drag_begin              (GtkWidget          *widget,
-                                                              GdkDragContext     *context);
 static void          thunar_shortcut_drag_data_received      (GtkWidget          *widget,
                                                               GdkDragContext     *context,
                                                               gint                x,
@@ -113,8 +111,6 @@ static gboolean      thunar_shortcut_drag_drop               (GtkWidget         
                                                               gint                x,
                                                               gint                y,
                                                               guint               timestamp);
-static void          thunar_shortcut_drag_end                (GtkWidget          *widget,
-                                                              GdkDragContext     *context);
 static void          thunar_shortcut_drag_leave              (GtkWidget          *widget,
                                                               GdkDragContext     *context,
                                                               guint               timestamp);
@@ -188,7 +184,6 @@ static void          thunar_shortcut_poke_location_finish    (ThunarBrowser     
 static void          thunar_shortcut_set_spinning            (ThunarShortcut     *shortcut,
                                                               gboolean            spinning,
                                                               ThunarShortcutState new_state);
-static const gchar  *thunar_shortcut_get_display_name        (ThunarShortcut     *shortcut);
 static GIcon        *thunar_shortcut_get_display_icon        (ThunarShortcut     *shortcut);
 
 
@@ -239,8 +234,6 @@ struct _ThunarShortcut
   guint               drop_data_ready : 1;
   GList              *drop_file_list;
 
-  GdkPixmap          *pre_drag_snapshot;
-
   gint                pressed_button;
 };
 
@@ -252,11 +245,6 @@ G_DEFINE_TYPE_WITH_CODE (ThunarShortcut, thunar_shortcut, GTK_TYPE_EVENT_BOX,
 
 
 static guint shortcut_signals[LAST_SIGNAL];
-
-static const GtkTargetEntry drag_targets[] =
-{
-  { "THUNAR_DND_TARGET_SHORTCUT", GTK_TARGET_SAME_APP, THUNAR_DND_TARGET_SHORTCUT }
-};
 
 static const GtkTargetEntry drop_targets[] =
 {
@@ -283,10 +271,8 @@ thunar_shortcut_class_init (ThunarShortcutClass *klass)
   gtkwidget_class = GTK_WIDGET_CLASS (klass);
   gtkwidget_class->button_press_event = thunar_shortcut_button_press_event;
   gtkwidget_class->button_release_event = thunar_shortcut_button_release_event;
-  gtkwidget_class->drag_begin = thunar_shortcut_drag_begin;
   gtkwidget_class->drag_data_received = thunar_shortcut_drag_data_received;
   gtkwidget_class->drag_drop = thunar_shortcut_drag_drop;
-  gtkwidget_class->drag_end = thunar_shortcut_drag_end;
   gtkwidget_class->drag_leave = thunar_shortcut_drag_leave;
   gtkwidget_class->drag_motion = thunar_shortcut_drag_motion;
   gtkwidget_class->key_press_event = thunar_shortcut_key_press_event;
@@ -539,14 +525,6 @@ thunar_shortcut_constructed (GObject *object)
 
   /* mark as constructed so now all properties can be changed as usual */
   shortcut->constructed = TRUE;
-
-  if (shortcut->mutable)
-    {
-      /* set up drag support for re-ordering shortcuts */
-      gtk_drag_source_set (GTK_WIDGET (shortcut), GDK_BUTTON1_MASK,
-                           drag_targets, G_N_ELEMENTS (drag_targets),
-                           GDK_ACTION_MOVE);
-    }
 }
 
 
@@ -555,10 +533,6 @@ static void
 thunar_shortcut_finalize (GObject *object)
 {
   ThunarShortcut *shortcut = THUNAR_SHORTCUT (object);
-
-  /* release the pre-drag snapshot */
-  if (shortcut->pre_drag_snapshot != NULL)
-    g_object_unref (shortcut->pre_drag_snapshot);
 
   /* release the spinner and action image */
   g_object_unref (shortcut->spinner);
@@ -829,33 +803,6 @@ thunar_shortcut_button_release_event (GtkWidget      *widget,
 
 
 static void
-thunar_shortcut_drag_begin (GtkWidget      *widget,
-                            GdkDragContext *context)
-{
-  ThunarShortcut *shortcut = THUNAR_SHORTCUT (widget);
-
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUT (widget));
-  _thunar_return_if_fail (GDK_IS_DRAG_CONTEXT (context));
-
-  /* reset the pressed button state */
-  shortcut->pressed_button = -1;
-
-  /* take a snapshot of the shortcut */
-  if (shortcut->pre_drag_snapshot != NULL)
-    {
-      g_object_unref (shortcut->pre_drag_snapshot);
-      shortcut->pre_drag_snapshot = NULL;
-    }
-  shortcut->pre_drag_snapshot = gtk_widget_get_snapshot (widget, NULL);
-
-  /* call the parent's drag_begin() handler */
-  if (GTK_WIDGET_CLASS (thunar_shortcut_parent_class)->drag_begin != NULL)
-    (*GTK_WIDGET_CLASS (thunar_shortcut_parent_class)->drag_begin) (widget, context);
-}
-
-
-
-static void
 thunar_shortcut_drag_data_received (GtkWidget        *widget,
                                     GdkDragContext   *context,
                                     gint              x,
@@ -974,28 +921,6 @@ thunar_shortcut_drag_drop (GtkWidget      *widget,
       /* we cannot handle the drop */
       return FALSE;
     }
-}
-
-
-
-static void
-thunar_shortcut_drag_end (GtkWidget      *widget,
-                          GdkDragContext *context)
-{
-  ThunarShortcut *shortcut = THUNAR_SHORTCUT (widget);
-
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUT (widget));
-  _thunar_return_if_fail (GDK_IS_DRAG_CONTEXT (context));
-
-  /* reset the pressed button state */
-  shortcut->pressed_button = -1;
-
-  /* show the shortcut again as we are finished dragging it */
-  gtk_widget_show (widget);
-
-  /* call the parent's drag_begin() handler */
-  if (GTK_WIDGET_CLASS (thunar_shortcut_parent_class)->drag_end != NULL)
-    (*GTK_WIDGET_CLASS (thunar_shortcut_parent_class)->drag_end) (widget, context);
 }
 
 
@@ -1995,22 +1920,6 @@ thunar_shortcut_set_spinning (ThunarShortcut     *shortcut,
 
 
 
-static const gchar *
-thunar_shortcut_get_display_name (ThunarShortcut *shortcut)
-{
-  const gchar *label;
-
-  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT (shortcut), NULL);
-  
-  label = thunar_shortcut_get_custom_name (shortcut);
-  if (label == NULL)
-    label = thunar_shortcut_get_name (shortcut);
-
-  return label;
-}
-
-
-
 static GIcon *
 thunar_shortcut_get_display_icon (ThunarShortcut *shortcut)
 {
@@ -2846,9 +2755,16 @@ thunar_shortcut_matches_location (ThunarShortcut *shortcut,
 
 
 
-GdkPixmap *
-thunar_shortcut_get_pre_drag_snapshot (ThunarShortcut *shortcut)
+const gchar *
+thunar_shortcut_get_display_name (ThunarShortcut *shortcut)
 {
+  const gchar *label;
+
   _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT (shortcut), NULL);
-  return shortcut->pre_drag_snapshot;
+  
+  label = thunar_shortcut_get_custom_name (shortcut);
+  if (label == NULL)
+    label = thunar_shortcut_get_name (shortcut);
+
+  return label;
 }
