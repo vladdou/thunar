@@ -2980,28 +2980,6 @@ thunar_file_get_custom_icon (const ThunarFile *file)
 
 
 /**
- * thunar_file_get_icon:
- * @file : a #ThunarFile instance.
- *
- * Returns the icon for @file if any, else %NULL is returned.
- *
- * Return value: the icon for @file or %NULL, the GIcon is owner
- * by the file, so do not unref it.
- **/
-GIcon *
-thunar_file_get_icon (const ThunarFile *file)
-{
-  _thunar_return_val_if_fail (THUNAR_IS_FILE (file), NULL);
-
-  if (file->info == NULL)
-    return NULL;
-
-  return g_file_info_get_icon (file->info);
-}
-
-
-
-/**
  * thunar_file_get_preview_icon:
  * @file : a #ThunarFile instance.
  *

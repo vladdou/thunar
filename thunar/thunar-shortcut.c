@@ -1316,11 +1316,13 @@ thunar_shortcut_matches_types (ThunarShortcut    *shortcut,
 static void
 thunar_shortcut_update (ThunarShortcut *shortcut)
 {
-  const gchar *display_name;
-  GIcon       *icon;
-  gchar       *base_name;
-  gchar       *name;
-  gchar       *uri;
+  GtkIconTheme *icon_theme;
+  const gchar  *display_name;
+  GIcon        *icon = NULL;
+  gchar        *base_name;
+  gchar        *icon_name;
+  gchar        *name;
+  gchar        *uri;
 
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
 
@@ -1339,13 +1341,23 @@ thunar_shortcut_update (ThunarShortcut *shortcut)
           thunar_shortcut_set_name (shortcut, display_name);
 
           /* update the icon of the shortcut */
-          icon = thunar_file_get_icon (shortcut->file);
+          icon_theme = gtk_icon_theme_get_default ();
+          icon_name = thunar_file_get_icon_name (shortcut->file, 
+                                                 THUNAR_FILE_ICON_STATE_DEFAULT,
+                                                 icon_theme);
+          g_debug ("%30s has icon name %s and custom icon %p",
+                   thunar_shortcut_get_display_name (shortcut),
+                   icon_name,
+                   shortcut->custom_icon);
+          if (icon_name != NULL)
+            icon = g_themed_icon_new (icon_name);
           thunar_shortcut_set_icon (shortcut, icon);
+          g_object_unref (icon);
+          g_free (icon_name);
 
           if (thunar_file_get_kind (shortcut->file) == G_FILE_TYPE_MOUNTABLE)
             {
-              g_debug ("%s is mountable",
-                       display_name);
+              g_debug ("%s is mountable", display_name);
             }
         }
       else if (shortcut->location != NULL)
@@ -2111,6 +2123,10 @@ thunar_shortcut_set_icon (ThunarShortcut *shortcut,
 {
   _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
   _thunar_return_if_fail (icon == NULL || G_IS_ICON (icon));
+
+  g_debug ("%30s set icon to %s",
+           thunar_shortcut_get_display_name (shortcut),
+           icon ? g_icon_to_string (icon) : NULL);
 
   if (icon == NULL && !shortcut->constructed)
     return;

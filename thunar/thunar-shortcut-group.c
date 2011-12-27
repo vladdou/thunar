@@ -37,7 +37,7 @@
 #define THUNAR_SHORTCUT_GROUP_FLASH_TIMES     3
 
 #define THUNAR_SHORTCUT_GROUP_MARKUP \
-  "<span size='medium' weight='bold' color='#353535'>%s</span>"
+  "<span size='medium' weight='bold'>%s</span>"
 
 
 

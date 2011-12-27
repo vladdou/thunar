@@ -242,7 +242,6 @@ const gchar     *thunar_file_get_thumbnail_path    (const ThunarFile        *fil
 gboolean         thunar_file_is_thumbnail          (const ThunarFile        *file);
 void             thunar_file_set_thumb_state       (ThunarFile              *file, 
                                                     ThunarFileThumbState     state);
-GIcon            *thunar_file_get_icon             (const ThunarFile        *file);
 GIcon            *thunar_file_get_preview_icon     (const ThunarFile        *file);
 gchar            *thunar_file_get_icon_name        (const ThunarFile        *file,
                                                     ThunarFileIconState     icon_state,
