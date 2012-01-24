@@ -99,29 +99,6 @@ static gboolean      thunar_shortcut_button_press_event      (GtkWidget         
                                                               GdkEventButton     *event);
 static gboolean      thunar_shortcut_button_release_event    (GtkWidget          *widget,
                                                               GdkEventButton     *event);
-static void          thunar_shortcut_drag_data_received      (GtkWidget          *widget,
-                                                              GdkDragContext     *context,
-                                                              gint                x,
-                                                              gint                y,
-                                                              GtkSelectionData   *selection_data,
-                                                              guint               info,
-                                                              guint               timestamp);
-static gboolean      thunar_shortcut_drag_drop               (GtkWidget          *widget,
-                                                              GdkDragContext     *context,
-                                                              gint                x,
-                                                              gint                y,
-                                                              guint               timestamp);
-static void          thunar_shortcut_drag_leave              (GtkWidget          *widget,
-                                                              GdkDragContext     *context,
-                                                              guint               timestamp);
-static gboolean      thunar_shortcut_drag_motion             (GtkWidget          *widget,
-                                                              GdkDragContext     *context,
-                                                              gint                x,
-                                                              gint                y,
-                                                              guint               timestamp);
-static GdkDragAction thunar_shortcut_compute_drop_actions    (ThunarShortcut     *shortcut,
-                                                              GdkDragContext     *context,
-                                                              GdkDragAction      *suggested_action);
 static gboolean      thunar_shortcut_key_press_event         (GtkWidget          *widget,
                                                               GdkEventKey        *event);
 static gboolean      thunar_shortcut_enter_notify_event      (GtkWidget          *widget,
@@ -230,9 +207,6 @@ struct _ThunarShortcut
   ThunarShortcutState state;
 
   guint               drag_highlight : 1;
-  guint               drop_occurred : 1;
-  guint               drop_data_ready : 1;
-  GList              *drop_file_list;
 
   gint                pressed_button;
 };
@@ -245,11 +219,6 @@ G_DEFINE_TYPE_WITH_CODE (ThunarShortcut, thunar_shortcut, GTK_TYPE_EVENT_BOX,
 
 
 static guint shortcut_signals[LAST_SIGNAL];
-
-static const GtkTargetEntry drop_targets[] =
-{
-  { "text/uri-list", 0, THUNAR_DND_TARGET_TEXT_URI_LIST },
-};
 
 
 
@@ -271,10 +240,6 @@ thunar_shortcut_class_init (ThunarShortcutClass *klass)
   gtkwidget_class = GTK_WIDGET_CLASS (klass);
   gtkwidget_class->button_press_event = thunar_shortcut_button_press_event;
   gtkwidget_class->button_release_event = thunar_shortcut_button_release_event;
-  gtkwidget_class->drag_data_received = thunar_shortcut_drag_data_received;
-  gtkwidget_class->drag_drop = thunar_shortcut_drag_drop;
-  gtkwidget_class->drag_leave = thunar_shortcut_drag_leave;
-  gtkwidget_class->drag_motion = thunar_shortcut_drag_motion;
   gtkwidget_class->key_press_event = thunar_shortcut_key_press_event;
   gtkwidget_class->enter_notify_event = thunar_shortcut_enter_notify_event;
   gtkwidget_class->leave_notify_event = thunar_shortcut_leave_notify_event;
@@ -504,16 +469,6 @@ thunar_shortcut_init (ThunarShortcut *shortcut)
   shortcut->preferences = thunar_preferences_get ();
   exo_binding_new (G_OBJECT (shortcut->preferences), "shortcuts-icon-size",
                    G_OBJECT (shortcut), "icon-size");
-
-  /* set up drop support for the shortcut */
-  gtk_drag_dest_set (GTK_WIDGET (shortcut), 0,
-                     drop_targets, G_N_ELEMENTS (drop_targets),
-                     GDK_ACTION_COPY | GDK_ACTION_MOVE | GDK_ACTION_LINK);
-
-  /* reset drop information */
-  shortcut->drop_occurred = FALSE;
-  shortcut->drop_data_ready = FALSE;
-  shortcut->drop_file_list = NULL;
 }
 
 
@@ -798,241 +753,6 @@ thunar_shortcut_button_release_event (GtkWidget      *widget,
   shortcut->pressed_button = -1;
 
   return FALSE;
-}
-
-
-
-static void
-thunar_shortcut_drag_data_received (GtkWidget        *widget,
-                                    GdkDragContext   *context,
-                                    gint              x,
-                                    gint              y,
-                                    GtkSelectionData *selection_data,
-                                    guint             info,
-                                    guint             timestamp)
-{
-  ThunarShortcut *shortcut = THUNAR_SHORTCUT (widget);
-  GdkDragAction   actions;
-  GdkDragAction   action;
-  gboolean        success = FALSE;
-
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUT (widget));
-  _thunar_return_if_fail (GDK_IS_DRAG_CONTEXT (context));
-
-  /* check if we don't already know the drop data */
-  if (!shortcut->drop_data_ready)
-    {
-      /* extract the URI list from the selection data (if valid) */
-      if (info == THUNAR_DND_TARGET_TEXT_URI_LIST
-          && selection_data->format == 8
-          && selection_data->length > 0)
-        {
-          shortcut->drop_file_list = 
-            thunar_g_file_list_new_from_string ((const gchar *) selection_data->data);
-        }
-
-      /* reset the state */
-      shortcut->drop_data_ready = TRUE;
-    }
-
-  /* check if the data was dropped */
-  if (shortcut->drop_occurred)
-    {
-      /* reset the drop state */
-      shortcut->drop_occurred = FALSE;
-
-      /* make sure we only handle text/uri-list */
-      if (info == THUNAR_DND_TARGET_TEXT_URI_LIST)
-        {
-          if (shortcut->file != NULL)
-            {
-              /* determine the drop actions */
-              actions = thunar_shortcut_compute_drop_actions (shortcut, context, 
-                                                              &action);
-
-              /* check whether the actions are supported */
-              if ((actions & (GDK_ACTION_COPY
-                              | GDK_ACTION_MOVE 
-                              | GDK_ACTION_LINK)) != 0)
-                {
-                  /* if necessary, ask the user what he wants to do */
-                  if (action == GDK_ACTION_ASK)
-                    {
-                      action = thunar_dnd_ask (widget,
-                                               shortcut->file,
-                                               shortcut->drop_file_list,
-                                               timestamp,
-                                               actions);
-                    }
-
-                  /* if we have a drop action, perform it now */
-                  if (action != 0)
-                    {
-                      success = thunar_dnd_perform (widget,
-                                                    shortcut->file,
-                                                    shortcut->drop_file_list,
-                                                    action,
-                                                    NULL);
-                    }
-                }
-            }
-
-          /* disable highlighting and release the drag data */
-          thunar_shortcut_drag_leave (widget, context, timestamp);
-
-          /* tell the peer that we handled the copy */
-          gtk_drag_finish (context, success, FALSE, timestamp);
-        }
-    }
-  else
-    {
-      gdk_drag_status (context, 0, timestamp);
-    }
-}
-
-
-
-static gboolean
-thunar_shortcut_drag_drop (GtkWidget      *widget,
-                           GdkDragContext *context,
-                           gint            x,
-                           gint            y,
-                           guint           timestamp)
-{
-  ThunarShortcut *shortcut = THUNAR_SHORTCUT (widget);
-  GdkAtom         target;
-
-  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT (widget), FALSE);
-  _thunar_return_val_if_fail (GDK_IS_DRAG_CONTEXT (context), FALSE);
-
-  target = gtk_drag_dest_find_target (widget, context, NULL);
-  if (target == gdk_atom_intern_static_string ("text/uri-list"))
-    {
-      /* set the state so that drag_data_received knows that it needs to drop now */
-      shortcut->drop_occurred = TRUE;
-
-      /* request the drag data from the source and perform the drop */
-      gtk_drag_get_data (widget, context, target, timestamp);
-
-      return TRUE;
-    }
-  else
-    {
-      /* we cannot handle the drop */
-      return FALSE;
-    }
-}
-
-
-
-static void
-thunar_shortcut_drag_leave (GtkWidget      *widget,
-                            GdkDragContext *context,
-                            guint           timestamp)
-{
-  ThunarShortcut *shortcut = THUNAR_SHORTCUT (widget);
-
-  _thunar_return_if_fail (THUNAR_IS_SHORTCUT (widget));
-  _thunar_return_if_fail (GDK_IS_DRAG_CONTEXT (context));
-
-  /* reset highlighting */
-  shortcut->drag_highlight = FALSE;
-
-  /* reset the "drop data ready" status and free the file list */
-  if (shortcut->drop_data_ready)
-    {
-      thunar_g_file_list_free (shortcut->drop_file_list);
-      shortcut->drop_file_list = NULL;
-      shortcut->drop_data_ready = FALSE;
-    }
-
-  /* schedule a repaint to make sure the shortcut is no longer highlighted */
-  gtk_widget_queue_draw (widget);
-
-  /* call the parent's handler */
-  if (GTK_WIDGET_CLASS (thunar_shortcut_parent_class)->drag_leave != NULL)
-    (*GTK_WIDGET_CLASS (thunar_shortcut_parent_class)->drag_leave) (widget, context, timestamp);
-}
-
-
-
-static gboolean
-thunar_shortcut_drag_motion (GtkWidget      *widget,
-                             GdkDragContext *context,
-                             gint            x,
-                             gint            y,
-                             guint           timestamp)
-{
-  ThunarShortcut *shortcut = THUNAR_SHORTCUT (widget);
-  GdkDragAction   actions;
-  GdkAtom         target;
-
-  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT (widget), FALSE);
-  _thunar_return_val_if_fail (GDK_IS_DRAG_CONTEXT (context), FALSE);
-
-  /* determine the drag target */
-  target = gtk_drag_dest_find_target (widget, context, NULL);
-
-  /* abort if the target is unsupported */
-  if (target != gdk_atom_intern_static_string ("text/uri-list"))
-    {
-      /* unsupported target, can't handle it, sorry */
-      return FALSE;
-    }
-
-  /* request the drop data on-demand (if we don't have it yet) */
-  if (!shortcut->drop_data_ready)
-    {
-      /* request the drag data from the source */
-      gtk_drag_get_data (widget, context, target, timestamp);
-      return TRUE;
-    }
-  else
-    {
-      /* check whether we have any files at all */
-      if (shortcut->drop_file_list != NULL)
-        thunar_shortcut_compute_drop_actions (shortcut, context, &actions);
-    }
-
-  /* tell Gdk whether we can drop here */
-  gdk_drag_status (context, actions, timestamp);
-
-  /* highlight the shortcut */
-  shortcut->drag_highlight = TRUE;
-  gtk_widget_queue_draw (widget);
-
-  return TRUE;
-}
-
-
-
-static GdkDragAction
-thunar_shortcut_compute_drop_actions (ThunarShortcut *shortcut,
-                                      GdkDragContext *context,
-                                      GdkDragAction  *suggested_action)
-{
-  GdkDragAction actions;
-
-  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT (shortcut), 0);
-  _thunar_return_val_if_fail (GDK_IS_DRAG_CONTEXT (context), 0);
-
-  if (shortcut->file != NULL)
-    {
-      actions = thunar_file_accepts_drop (shortcut->file,
-                                          shortcut->drop_file_list,
-                                          context,
-                                          suggested_action);
-    }
-  else
-    {
-      /* we know nothing about the file, just report back that dropping
-       * here is impossible */
-      actions = 0;
-      if (suggested_action != NULL)
-        *suggested_action = 0;
-    }
-
-  return actions;
 }
 
 
@@ -2783,4 +2503,48 @@ thunar_shortcut_get_display_name (ThunarShortcut *shortcut)
     label = thunar_shortcut_get_name (shortcut);
 
   return label;
+}
+
+
+
+GdkDragAction
+thunar_shortcut_compute_drop_actions (ThunarShortcut *shortcut,
+                                      GList          *drop_file_list,
+                                      GdkDragContext *context,
+                                      GdkDragAction  *suggested_action)
+{
+  GdkDragAction actions;
+
+  _thunar_return_val_if_fail (THUNAR_IS_SHORTCUT (shortcut), 0);
+  _thunar_return_val_if_fail (GDK_IS_DRAG_CONTEXT (context), 0);
+
+  if (shortcut->file != NULL)
+    {
+      actions = thunar_file_accepts_drop (shortcut->file,
+                                          drop_file_list,
+                                          context,
+                                          suggested_action);
+    }
+  else
+    {
+      /* we know nothing about the file, just report back that dropping
+       * here is impossible */
+      actions = 0;
+      if (suggested_action != NULL)
+        *suggested_action = 0;
+    }
+
+  return actions;
+}
+
+
+
+void
+thunar_shortcut_set_drag_highlight (ThunarShortcut *shortcut,
+                                    gboolean        highlight)
+{
+  _thunar_return_if_fail (THUNAR_IS_SHORTCUT (shortcut));
+  
+  shortcut->drag_highlight = !!highlight;
+  gtk_widget_queue_draw (GTK_WIDGET (shortcut));
 }

@@ -1,3 +1,17 @@
+Branch jannis/new-shortcuts-pane
+================================
+
+ - Reordering shortcuts may not change the order or position of immutable
+   shortcuts. That still needs to be implemented in ThunarShortcutGroup.
+
+ - Dragging a URI to the new shortcuts pane must either cause an empty
+   spot indicator to show up or must indicate possible drop actions on
+   the current shortcut. The latter already works, the empty spot
+   indicator still needs to be implemented.
+
+ -
+
+
 Important for Thunar 1.2
 ========================
 

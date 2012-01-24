@@ -1,6 +1,6 @@
 /* vi:set et ai sw=2 sts=2 ts=2: */
 /*-
- * Copyright (c) 2011 Jannis Pohlmann <jannis@xfce.org>
+ * Copyright (c) 2011-2012 Jannis Pohlmann <jannis@xfce.org>
  *
  * This program is free software; you can redistribute it and/or 
  * modify it under the terms of the GNU General Public License as
@@ -93,6 +93,12 @@ gboolean           thunar_shortcut_matches_file          (ThunarShortcut    *sho
 gboolean           thunar_shortcut_matches_location      (ThunarShortcut    *shortcut,
                                                           GFile             *location);
 const gchar       *thunar_shortcut_get_display_name      (ThunarShortcut    *shortcut);
+GdkDragAction      thunar_shortcut_compute_drop_actions  (ThunarShortcut    *shortcut,
+                                                          GList             *drop_file_list,
+                                                          GdkDragContext    *context,
+                                                          GdkDragAction     *suggested_action);
+void               thunar_shortcut_set_drag_highlight    (ThunarShortcut    *shortcut,
+                                                          gboolean           highlight);
 
 G_END_DECLS
 
