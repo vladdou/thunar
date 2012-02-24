@@ -225,6 +225,8 @@ static guint shortcut_signals[LAST_SIGNAL];
 static void
 thunar_shortcut_class_init (ThunarShortcutClass *klass)
 {
+  static gboolean style_initialized = FALSE;
+
   GtkWidgetClass *gtkwidget_class;
   GObjectClass   *gobject_class;
 
@@ -390,6 +392,18 @@ thunar_shortcut_class_init (ThunarShortcutClass *klass)
                   0, NULL, NULL,
                   g_cclosure_marshal_VOID__VOID,
                   G_TYPE_NONE, 0);
+
+  if (!style_initialized)
+    {
+      gtk_rc_parse_string ("style \"thunar-shortcut-internal\" {\n"
+                           "  GtkButton::inner-border = { 0, 0, 0, 0 }\n"
+                           "  GtkButton::child-displacement-x = 0\n"
+                           "  GtkButton::child-displacement-y = 0\n"
+                           "}\n"
+                           "widget_class \"*.ThunarShortcut.*.GtkButton\" "
+                           "  style \"thunar-shortcut-internal\"\n");
+      style_initialized = TRUE;
+    }
 }
 
 

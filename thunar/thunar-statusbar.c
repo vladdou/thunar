@@ -94,6 +94,7 @@ thunar_statusbar_class_init (ThunarStatusbarClass *klass)
                            "}\n"
                            "class \"ThunarStatusbar\" "
                            "style \"thunar-statusbar-internal\"\n");
+      style_initialized = TRUE;
     }
 }
 
