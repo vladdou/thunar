@@ -3218,6 +3218,10 @@ compare_by_name_using_number (const gchar *ap,
   gchar        bc;
   guint        skipped_zeros_a;
   guint        skipped_zeros_b;
+  const gchar *original_ap = ap;
+  const gchar *original_bp = bp;
+  gchar        hex_ac;
+  gchar        hex_bc;
 
   /* up until now the numbers match. Now compare the numbers by digit
    * count, the longest number is the largest. If the lengths are equal
@@ -3227,7 +3231,8 @@ compare_by_name_using_number (const gchar *ap,
   skipped_zeros_a = skip_leading_zeros (&ap, start_a);
   skipped_zeros_b = skip_leading_zeros (&bp, start_b);
 
-  /* determine the largest number */
+  /* advance until we've reached the end of the shorter one of the two
+   * number strings */
   for (ai = ap, bi = bp;; ++ai, ++bi)
     {
       ac = *ai;
@@ -3236,14 +3241,47 @@ compare_by_name_using_number (const gchar *ap,
         break;
     }
 
-  /* if one of the numbers still has a digit, that number is the largest. */
+  /* check if the two strings are potential hex numbers */
+  if (g_ascii_isxdigit (ac) && g_ascii_isxdigit (bc))
+    {
+      /* advance until we hit a non-hex character */
+      for (ai = original_ap, bi = original_bp;; ++ai, ++bi)
+        {
+          hex_ac = *ai;
+          hex_bc = *bi;
+          if (!g_ascii_isxdigit (hex_ac) || !g_ascii_isxdigit (hex_bc))
+            break;
+        }
+
+      /* check if both potential hex numbers end at the same offset */
+      if (!g_ascii_isxdigit (hex_ac) && !g_ascii_isxdigit (hex_bc))
+        {
+          /* original_ap, original_bp either point to the first character where
+           * the two strings differ or to the character before that; in the second
+           * case we have to advance by one. after that we can perform an ASCII
+           * comparison on the first different character */
+          hex_ac = *original_ap;
+          hex_bc = *original_bp;
+          if (hex_ac == hex_bc)
+            {
+              original_ap += 1;
+              original_bp += 1;
+              hex_ac = *original_ap;
+              hex_bc = *original_bp;
+            }
+          return hex_ac - hex_bc;
+        }
+    }
+
+  /* if one of the number strings continues while the other has already
+   * stopped at the current offset, that first number is larger */
   if (g_ascii_isdigit (ac))
     return 1;
   else if (g_ascii_isdigit (bc))
     return -1;
 
-  /* both numbers have the same length. look for the first digit that
-   * is different */
+  /* both number strings have the same length. look for the first digit
+   * that is different */
   for (;; ++ap, ++bp)
     {
       ac = *ap;
